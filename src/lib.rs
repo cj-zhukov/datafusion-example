@@ -13,9 +13,7 @@ use aws_sdk_s3::Client;
 use datafusion::arrow::array::{builder, make_array, Array, ArrayData, ArrayDataBuilder, ArrayRef, AsArray, BooleanArray, Float64Array, Int32Array, Int32Builder, ListArray, ListBuilder, PrimitiveArray, StringArray, StructArray};
 use datafusion::arrow::datatypes::{ArrowPrimitiveType, DataType, Field, GenericStringType, Int32Type, Schema, UInt32Type, Utf8Type};
 use datafusion::arrow::record_batch::RecordBatch;
-// use datafusion::config::ConfigOptions;
 use datafusion::dataframe::DataFrameWriteOptions;
-// use datafusion::logical_expr::expr::Unnest;
 use datafusion::arrow;
 use datafusion::scalar::ScalarValue;
 use datafusion::prelude::*;
@@ -713,7 +711,12 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
     for i in res.keys().sorted() {
         primary_keys.push(*i);
         let row = res[i].clone();
-        let str_row = serde_json::to_string(&row)?;
+        let str_row = if row.len() > 0 {
+            let str_row = serde_json::to_string(&row)?;
+            Some(str_row)
+        } else {
+            None
+        };
         data_all.push(str_row);
     }
 
