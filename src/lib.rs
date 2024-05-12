@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::io::Write;
+use std::io::{Cursor, Write};
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -11,17 +11,22 @@ use awscreds::Credentials;
 use aws_config::{BehaviorVersion, Region};
 use aws_sdk_s3::Client;
 use datafusion::arrow::array::{builder, make_array, Array, ArrayData, ArrayDataBuilder, ArrayRef, AsArray, BooleanArray, Float64Array, Int32Array, Int32Builder, ListArray, ListBuilder, PrimitiveArray, StringArray, StructArray};
-use datafusion::arrow::datatypes::{ArrowPrimitiveType, DataType, Field, GenericStringType, Int32Type, Schema, UInt32Type, Utf8Type};
+use datafusion::arrow::datatypes::{ArrowPrimitiveType, DataType, Field, Fields, GenericStringType, Int32Type, Schema, UInt32Type, Utf8Type};
 use datafusion::arrow::record_batch::RecordBatch;
+// use datafusion::config::ConfigOptions;
 use datafusion::dataframe::DataFrameWriteOptions;
+// use datafusion::logical_expr::expr::Unnest;
 use datafusion::arrow;
 use datafusion::scalar::ScalarValue;
 use datafusion::prelude::*;
 use object_store::aws::AmazonS3Builder;
-use parquet::arrow::AsyncArrowWriter;
+use parquet::arrow::{AsyncArrowWriter, ParquetRecordBatchStreamBuilder};
 use serde_json::{Map, Value};
 use itertools::{izip, Itertools};
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 use tokio_stream::StreamExt;
+use futures_util::TryStreamExt;
 use url::Url;
 
 fn parse_to_primitive<'a, T, I>(iter: I) -> PrimitiveArray<T>
@@ -462,8 +467,10 @@ pub async fn get_df3() -> anyhow::Result<DataFrame> {
         vec![
             Arc::new(Int32Array::from(vec![1, 2, 3])),
             Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
+            // Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+            // Arc::new(Int32Array::from(vec![42, 43, 44])),
+            Arc::new(StringArray::from(vec![None, None, Some("baz")])),
+            Arc::new(Int32Array::from(vec![None, None, Some(44)])),
         ],
     )?;
     let df = ctx.read_batch(batch.clone())?;
@@ -711,6 +718,75 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
     for i in res.keys().sorted() {
         primary_keys.push(*i);
         let row = res[i].clone();
+        // add Option type for json string like col
+        let str_row = if row.len() > 0 {
+            let str_row = serde_json::to_string(&row)?;
+            Some(str_row)
+        } else {
+            None
+        };
+        data_all.push(str_row);
+    }
+
+    let mut right_cols = primary_key.to_string();
+    right_cols.push_str("tojoin");
+    let schema = Schema::new(vec![
+        Field::new(right_cols.clone(), DataType::Int32, false),
+        Field::new(new_col.unwrap_or("metadata"), DataType::Utf8, true),
+    ]);
+    let batch = RecordBatch::try_new(
+        schema.clone().into(),
+        vec![
+            Arc::new(Int32Array::from(primary_keys)),
+            Arc::new(StringArray::from(data_all)),
+        ],
+    )?;
+    let df_to_json = ctx.read_batch(batch.clone())?;
+    
+    let res = df.join(df_to_json, JoinType::Inner, &[primary_key], &[&right_cols], None)?;
+
+    let columns = res
+        .schema()
+        .fields()
+        .iter()
+        .map(|x| x.name().as_str())
+        .filter(|x| !x.contains("tojoin"))
+        .filter(|x| cols_new.iter().find(|col| col.contains(x)).is_none())
+        .collect::<Vec<_>>();
+    // println!("{:?}", columns);
+
+    let res = res.clone().select_columns(&columns)?;
+
+    Ok(res)
+}
+
+pub async fn df_cols_to_json_dev(ctx: SessionContext, df: DataFrame, cols: &[&str], primary_key: &str, new_col: Option<&str>) -> anyhow::Result<DataFrame> {
+    let mut cols_new = cols.iter().map(|x| x.to_owned()).collect::<Vec<_>>();
+    cols_new.push(primary_key);
+
+    let df_cols_for_json = df.clone().select_columns(&cols_new)?;
+    let mut stream = df_cols_for_json.clone().execute_stream().await.context("could not create stream")?;
+    let buf = Vec::new();
+    let mut writer = arrow_json::ArrayWriter::new(buf);
+    while let Some(batch) = stream.next().await.transpose()? {
+        writer.write_batches(&[&batch])?;
+    }
+    writer.finish()?;
+    let json_data = writer.into_inner();
+    let json_rows: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice())?;
+    let mut res = HashMap::new();
+    for mut json in json_rows {
+        let primary_key = json.remove(primary_key).unwrap().to_string().parse::<i32>()?;
+        res.extend(HashMap::from([(primary_key, json)]));
+    }
+    // println!("res:{:?}", res);
+
+    let mut primary_keys = vec![];
+    let mut data_all = vec![];
+    for i in res.keys().sorted() {
+        primary_keys.push(*i);
+        let row = res[i].clone();
+        // add Option type for json string like col
         let str_row = if row.len() > 0 {
             let str_row = serde_json::to_string(&row)?;
             Some(str_row)
@@ -816,15 +892,11 @@ pub async fn df_struct_example() -> anyhow::Result<()> {
 
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
-        Field::new("id2", DataType::Int32, false),
-        Field::new("id3", DataType::Int32, false),
     ]);
     let batch = RecordBatch::try_new(
         schema.clone().into(),
         vec![
-            Arc::new(Int32Array::from(vec![1])),
-            Arc::new(Int32Array::from(vec![2])),
-            Arc::new(Int32Array::from(vec![3])),
+            Arc::new(Int32Array::from(vec![1, 2, 3])),
         ],
     )?;
     let df = ctx.read_batch(batch.clone())?;
@@ -834,15 +906,15 @@ pub async fn df_struct_example() -> anyhow::Result<()> {
     let str = Arc::new(StringArray::from(vec!["foo"]));
     let struct_array = StructArray::from(vec![
         (
-            Arc::new(Field::new("b", DataType::Boolean, false)),
+            Arc::new(Field::new("x", DataType::Boolean, false)),
             boolean.clone() as ArrayRef,
         ),
         (
-            Arc::new(Field::new("c", DataType::Int32, false)),
+            Arc::new(Field::new("y", DataType::Int32, false)),
             int.clone() as ArrayRef,
         ),
         (
-            Arc::new(Field::new("d", DataType::Utf8, false)),
+            Arc::new(Field::new("z", DataType::Utf8, false)),
             str.clone() as ArrayRef,
         ),
     ]);
@@ -912,6 +984,18 @@ pub async fn get_aws_client(region: &str) -> anyhow::Result<Client> {
     );
 
     Ok(client)
+}
+
+pub async fn read_file_to_df(ctx: SessionContext, file_path: &str) -> anyhow::Result<DataFrame> {
+    let mut buf = vec![];
+    let _n = File::open(file_path).await?.read_to_end(&mut buf).await?;
+    let stream = ParquetRecordBatchStreamBuilder::new(Cursor::new(buf))
+        .await?
+        .build()?;
+    let batches = stream.try_collect::<Vec<_>>().await?;
+    let df = ctx.read_batches(batches)?;
+
+    Ok(df)
 }
 
 pub async fn read_from_s3(ctx: SessionContext, bucket: &str, region: &str, key: &str) -> anyhow::Result<()> {
