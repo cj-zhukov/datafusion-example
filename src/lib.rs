@@ -29,6 +29,117 @@ use tokio_stream::StreamExt;
 use futures_util::TryStreamExt;
 use url::Url;
 
+// pub async fn foo() -> anyhow::Result<()> {
+//     let ctx = SessionContext::new();
+
+//     let schema = Schema::new(vec![
+//         Field::new("id", DataType::Int32, false),
+//     ]);
+//     let batch = RecordBatch::try_new(
+//         schema.clone().into(),
+//         vec![
+//             Arc::new(Int32Array::from(vec![1, 2, 3])),
+//         ],
+//     )?;
+//     let df = ctx.read_batch(batch.clone())?;
+
+//     let xs = Arc::new(Int32Array::from(vec![1]));
+//     let ys = Arc::new(Int32Array::from(vec![42]));
+//     let struct_array1 = StructArray::from(vec![
+//         (
+//             Arc::new(Field::new("x", DataType::Int32, false)),
+//             xs.clone() as ArrayRef,
+//         ),
+//         (
+//             Arc::new(Field::new("y", DataType::Int32, false)),
+//             ys.clone() as ArrayRef,
+//         )
+//     ]);
+
+//     let xs = Arc::new(Int32Array::from(vec![2]));
+//     let ys = Arc::new(Int32Array::from(vec![43]));
+//     let struct_array2 = StructArray::from(vec![
+//         (
+//             Arc::new(Field::new("x", DataType::Int32, false)),
+//             xs.clone() as ArrayRef,
+//         ),
+//         (
+//             Arc::new(Field::new("y", DataType::Int32, false)),
+//             ys.clone() as ArrayRef,
+//         )
+//     ]);
+
+//     let xs = Arc::new(Int32Array::from(vec![3]));
+//     let ys = Arc::new(Int32Array::from(vec![44]));
+//     let struct_array3 = StructArray::from(vec![
+//         (
+//             Arc::new(Field::new("x", DataType::Int32, false)),
+//             xs.clone() as ArrayRef,
+//         ),
+//         (
+//             Arc::new(Field::new("y", DataType::Int32, false)),
+//             ys.clone() as ArrayRef,
+//         )
+//     ]);
+
+//     let struct_arrays = vec![struct_array1, struct_array2, struct_array3];
+
+//     // let res = df.with_column("new_col", Expr::Literal(ScalarValue::Struct(struct_arrays.into())))?;
+//     let res = df.with_column("new_col", Expr::Literal(ScalarValue::List(struct_arrays)))?;
+//     res.clone().show().await?;
+
+//     Ok(())
+// }
+
+// pub async fn foo() -> anyhow::Result<()> {
+//     let ctx = SessionContext::new();
+
+//     let schema = Schema::new(vec![
+//         Field::new("id", DataType::Int32, false),
+//         Field::new("data", DataType::Struct(Fields::from(vec![
+//             Field::new("x", DataType::Int32, false),
+//             Field::new("y", DataType::Int32, false),
+//         ])), false),
+//     ]);
+//     let batch = RecordBatch::try_new(
+//         schema.clone().into(),
+//         vec![
+//             Arc::new(Int32Array::from(vec![1, 2, 3])),
+//             Arc::new(StructArray::from(vec![
+//                 (
+//                     Arc::new(Int32Array::from(vec![42])),
+//                     Arc::new(Int32Array::from(vec![1])),
+//                 ),
+//                 (
+//                     Arc::new(Int32Array::from(vec![43])),
+//                     Arc::new(Int32Array::from(vec![2])),
+//                 ),
+//                 (
+//                     Arc::new(Int32Array::from(vec![44])),
+//                     Arc::new(Int32Array::from(vec![3])),
+//                 ),
+//             ]))
+//         ],
+//     )?;
+//     let df = ctx.read_batch(batch.clone())?;
+
+//     /*let boolean = Arc::new(BooleanArray::from(vec![false, false, true, true]));
+//     let int = Arc::new(Int32Array::from(vec![42, 28, 19, 31]));
+
+//     let struct_array = StructArray::from(vec![
+//         (
+//             Arc::new(Field::new("b", DataType::Boolean, false)),
+//             boolean.clone() as ArrayRef,
+//         ),
+//         (
+//             Arc::new(Field::new("c", DataType::Int32, false)),
+//             int.clone() as ArrayRef,
+//         ),
+//     ]); */
+
+//     Ok(())
+// }
+
 fn parse_to_primitive<'a, T, I>(iter: I) -> PrimitiveArray<T>
 where
     T: ArrowPrimitiveType,

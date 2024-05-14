@@ -7,7 +7,7 @@ edition = "2021"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 futures-util = "0.3"
-datafusion = { version = "37", features = ["default"] }
+datafusion = { version = "38", features = ["default"] }
 arrow-json = "51"
 parquet = "51"
 object_store = { version = "0.9", features = ["aws", "cloud"] }
