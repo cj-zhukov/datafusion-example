@@ -803,10 +803,16 @@ pub async fn df_cols_to_json_example() -> anyhow::Result<()> {
 }
 
 // create json like string column, df should have primary_key with int type
-pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], primary_key: &str, new_col: Option<&str>) -> anyhow::Result<DataFrame> {
+pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], pk: &str, new_col: Option<&str>, drop_pk: Option<bool>) -> anyhow::Result<DataFrame> {
     let mut cols_new = cols.iter().map(|x| x.to_owned()).collect::<Vec<_>>();
-    cols_new.push(primary_key);
-
+    match drop_pk {
+        None => (),
+        Some(val) => match val {
+            true => { cols_new.push(pk); },
+            false => ()
+        }
+    }
+    
     let df_cols_for_json = df.clone().select_columns(&cols_new)?;
     let mut stream = df_cols_for_json.clone().execute_stream().await.context("could not create stream")?;
     let buf = Vec::new();
@@ -819,8 +825,8 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
     let json_rows: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice())?;
     let mut res = HashMap::new();
     for mut json in json_rows {
-        let primary_key = json.remove(primary_key).unwrap().to_string().parse::<i32>()?;
-        res.extend(HashMap::from([(primary_key, json)]));
+        let pk = json.remove(pk).unwrap().to_string().parse::<i32>()?;
+        res.extend(HashMap::from([(pk, json)]));
     }
     // println!("res:{:?}", res);
 
@@ -839,7 +845,7 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
         data_all.push(str_row);
     }
 
-    let mut right_cols = primary_key.to_string();
+    let mut right_cols = pk.to_string();
     right_cols.push_str("tojoin");
     let schema = Schema::new(vec![
         Field::new(right_cols.clone(), DataType::Int32, false),
@@ -854,7 +860,7 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
     )?;
     let df_to_json = ctx.read_batch(batch.clone())?;
     
-    let res = df.join(df_to_json, JoinType::Inner, &[primary_key], &[&right_cols], None)?;
+    let res = df.join(df_to_json, JoinType::Inner, &[pk], &[&right_cols], None)?;
 
     let columns = res
         .schema()
@@ -1180,7 +1186,7 @@ pub async fn write_to_file(df: DataFrame, file_path: &str) -> anyhow::Result<()>
     writer.close().await.context("could not close writer")?;
 
     let mut file = std::fs::File::create(file_path)?;
-    file.write_all(&mut buf)?;
+    file.write_all(&buf)?;
 
     Ok(())
 }
@@ -1335,7 +1341,7 @@ mod tests {
     
         let ctx = SessionContext::new();
         let df = ctx.read_batch(batch.clone()).unwrap();
-        let res = df_cols_to_json(ctx, df, &["name", "data"], "pkey", Some("metadata")).await.unwrap();
+        let res = df_cols_to_json(ctx, df, &["name", "data"], "pkey", Some("metadata"), Some(true)).await.unwrap();
 
         assert_eq!(res.schema().fields().len(), 2); // columns count
         assert_eq!(res.clone().count().await.unwrap(), 3); // rows count
