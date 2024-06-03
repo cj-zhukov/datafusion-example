@@ -21,7 +21,6 @@ async fn main() -> anyhow::Result<()> {
     // foo().await?;
     // df_struct_example().await?;
 
-
     println!("end processing elapsed: {:.2?}", now.elapsed());
 
     Ok(())
