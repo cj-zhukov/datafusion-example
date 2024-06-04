@@ -17,6 +17,7 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::dataframe::DataFrameWriteOptions;
 // use datafusion::logical_expr::expr::Unnest;
 use datafusion::arrow;
+use datafusion::logical_expr::expr::Unnest;
 use datafusion::scalar::ScalarValue;
 use datafusion::prelude::*;
 use object_store::aws::AmazonS3Builder;
@@ -762,10 +763,8 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
     let cols_new = match drop_pk {
         None => cols_new,
         Some(val) => match val {
-            true => { 
-                cols_new.into_iter().filter(|x| !x.contains(pk)).collect::<Vec<_>>()
-            },
-            false => cols_new
+            true => cols_new,
+            false => cols_new.into_iter().filter(|x| !x.contains(pk)).collect::<Vec<_>>()
         }
     };
 
@@ -888,25 +887,28 @@ pub async fn add_col_to_df_example() -> anyhow::Result<()> {
     let df = ctx.read_batch(batch.clone())?;
     df.clone().show().await?;
 
-    let new_col = vec!["foo", "bar", "baz"];
-    let scalars = new_col.iter().map(|val| ScalarValue::Utf8(Some(val.to_string()))).collect::<Vec<_>>();
-    let new_col = ScalarValue::new_list_from_iter(scalars.into_iter(), &DataType::Utf8);
-    let _ = df.clone().with_column("new_col1", Expr::Literal(ScalarValue::new_utf8("foo")))?; // add one string for all columns
-    let res = df.clone().with_column("new_col2", Expr::Literal(ScalarValue::List(new_col)))?; // add list
-    res.show().await?;
+    // let new_col = vec!["foo", "bar", "baz"];
+    // let scalars = new_col.iter().map(|val| ScalarValue::Utf8(Some(val.to_string()))).collect::<Vec<_>>();
+    // let new_col = ScalarValue::new_list_from_iter(scalars.into_iter(), &DataType::Utf8);
+    // let _ = df.clone().with_column("new_col1", Expr::Literal(ScalarValue::new_utf8("foo")))?; // add one string for all columns
+    // let res = df.clone().with_column("new_col2", Expr::Literal(ScalarValue::List(new_col)))?; // add list
+    // res.show().await?;
 
     // add column from vec doesn't work
     // https://github.com/apache/arrow-datafusion/pull/9592
-    // let new_col = vec!["foo", "bar", "baz"];
+    // let new_col = vec!["foo".to_string(), "bar".to_string(), "baz".to_string()];
     // let exprs = new_col.iter().map(|val| lit(*val)).collect::<Vec<_>>();
     // println!("exprs: {:?}", exprs);
-    // let res = df.with_column("new_col", Expr::Unnest(Unnest { exprs }))?;
+    // let res = df.with_column("new_col", Expr::Unnest(Unnest { expr: exprs }))?;
+    // let res = df.with_column("new_col", Expr::ScalarVariable(DataType::Utf8, new_col))?;
     // res.show().await?;
     /* 36 version -> 
     Internal error: Unnest should be rewritten to LogicalPlan::Unnest before type coercion.
     This was likely caused by a bug in DataFusion's code and we would welcome that you file an bug report in our issue tracker 
     */
     // 37 version -> Error: Error during planning: unnest() can only be applied to array, struct and null
+    // 38 version -> doesn't work pub expr: Box<Expr> in Unnest, but not vec<Epx>
+
 
     Ok(())
 }
@@ -1248,7 +1250,7 @@ mod tests {
     
         let ctx = SessionContext::new();
         let df = ctx.read_batch(batch.clone()).unwrap();
-        let res = df_cols_to_json(ctx, df, &["name", "data"], "pkey", Some("metadata"), Some(false)).await.unwrap();
+        let res = df_cols_to_json(ctx, df, &["name", "data"], "pkey", Some("metadata"), Some(true)).await.unwrap();
 
         assert_eq!(res.schema().fields().len(), 2); // columns count
         assert_eq!(res.clone().count().await.unwrap(), 3); // rows count
