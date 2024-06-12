@@ -11,8 +11,8 @@ use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use awscreds::Credentials;
 use aws_config::{BehaviorVersion, Region};
 use aws_sdk_s3::Client;
-use datafusion::arrow::array::{ArrayRef, AsArray, BooleanArray, Int32Array, StringArray, StructArray};
-use datafusion::arrow::datatypes::{DataType, Field, Fields, Int32Type, Schema};
+use datafusion::arrow::array::{ArrayBuilder, ArrayRef, AsArray, BooleanArray, Int32Array, StringArray, StructArray};
+use datafusion::arrow::datatypes::{DataType, Field, Fields, Int32Type, Schema, SchemaBuilder};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::arrow;
@@ -360,20 +360,60 @@ pub async fn join_sql() -> Result<()> {
     Ok(())
 }
 
-pub fn record_batches_to_json_rows() {
+pub fn record_batches_to_json_rows() -> Result<()> {
     let schema = Schema::new(vec![Field::new("a", DataType::Int32, false)]);
     let a = Int32Array::from(vec![1, 2, 3]);
     let batch = RecordBatch::try_new(Arc::new(schema), vec![Arc::new(a)]).unwrap();
-    let json_rows = arrow::json::writer::record_batches_to_json_rows(&[&batch]).unwrap();
+    
+    let buf = vec![];
+    let mut writer = arrow_json::ArrayWriter::new(buf);
+    writer.write(&batch).unwrap();
+    writer.finish()?;
+
+    let json_data = writer.into_inner();
+    let json_rows: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice())?;
     println!("{:?}", json_rows);
+
+    for json_row in json_rows {
+        let value = serde_json::Value::Object(json_row);
+        let val_str = serde_json::to_string(&value).unwrap();
+        println!("{}", val_str);
+    }
+
+    Ok(())
 }
 
-pub async fn df_cols_to_struct(ctx: SessionContext, df: DataFrame, cols: &[&str]) -> Result<DataFrame> {
-    
+pub async fn df_cols_to_struct(ctx: SessionContext, df: DataFrame, cols: &[&str]) -> Result<StructArray> {
+    let df_cols_to_struct = df.select_columns(cols)?;
+    let fields = df_cols_to_struct.schema().fields().to_owned();
+    println!("{:?}", fields);
+    let mut arrays = vec![];
+    let batches = df_cols_to_struct.collect().await?;
+    let mut data_builders: Vec<Box<dyn ArrayBuilder>> = vec![];
+    println!("batches len: {}", batches.len());
+    for batch in batches {
+        // let mut tmp_arr = vec![];
+        // for i in 0..cols.len() - 1 {
+        //     let data = 
+        // }
+        // let mut arr = vec![];
 
+        // let array = batch.columns();
+        // println!("arr: {:?}", array);
+        // arrays.extend(array);
+        // #2 cols in batch
+        for i in 0..batch.num_columns() {
+            let array = batch.column(i);
+            
+        }
+    }
+    println!("arr len: {}", arrays.len());
+    // println!("{:?}", arrays);
+    let sruct_array = StructArray::new(fields, arrays, None);
 
-    let df = ctx.read_empty()?;
-    Ok(df)
+    // let df = ctx.read_empty()?;
+
+    Ok(sruct_array)
 }
 
 pub async fn df_cols_to_json_example() -> Result<()> {
@@ -487,7 +527,8 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
     let buf = Vec::new();
     let mut writer = arrow_json::ArrayWriter::new(buf);
     while let Some(batch) = stream.next().await.transpose()? {
-        writer.write_batches(&[&batch])?;
+        // writer.write_batches(&[&batch])?;
+        writer.write(&batch)?;
     }
     writer.finish()?;
     let json_data = writer.into_inner();
@@ -497,8 +538,7 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
         let pk = json.remove(pk).unwrap().to_string().parse::<i32>()?;
         res.extend(HashMap::from([(pk, json)]));
     }
-    // println!("res:{:?}", res);
-
+    // println!("res:{:?}", res)
     let mut primary_keys = vec![];
     let mut data_all = vec![];
     for i in res.keys().sorted() {
@@ -552,25 +592,6 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
     let res = res.clone().select_columns(&columns)?;
 
     Ok(res)
-}
-
-pub fn df_to_json_str() {
-    let schema = Schema::new(vec![Field::new("a", DataType::Int32, false)]);
-    let a = Int32Array::from(vec![1, 2, 3]);
-    let batch = RecordBatch::try_new(Arc::new(schema), vec![Arc::new(a)]).unwrap();
-
-    let json_rows = arrow_json::writer::record_batches_to_json_rows(&[&batch]).unwrap();
-
-    assert_eq!(
-        serde_json::Value::Object(json_rows[1].clone()),
-        serde_json::json!({"a": 2}),
-    );
-
-    for json_row in json_rows {
-        let value = serde_json::Value::Object(json_row);
-        let val_str = serde_json::to_string(&value).unwrap();
-        println!("{}", val_str);
-    }
 }
 
 pub async fn add_col_to_df_example() -> Result<()> {
@@ -967,6 +988,26 @@ pub async fn write_batches_to_s3(client: Client, bucket: &str, key: &str, batche
 mod tests {
     use super::*;
     use datafusion::assert_batches_eq;
+
+    #[test]
+    fn test_cols_to_json_str() {
+        let schema = Schema::new(vec![Field::new("a", DataType::Int32, false)]);
+        let a = Int32Array::from(vec![1, 2, 3]);
+        let batch = RecordBatch::try_new(Arc::new(schema), vec![Arc::new(a)]).unwrap();
+    
+        let buf = vec![];
+        let mut writer = arrow_json::ArrayWriter::new(buf);
+        writer.write(&batch).unwrap();
+        writer.finish().unwrap();
+    
+        let json_data = writer.into_inner();
+        let json_rows: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice()).unwrap();
+    
+        assert_eq!(
+            serde_json::Value::Object(json_rows[1].clone()),
+            serde_json::json!({"a": 2}),
+        );
+    }
 
     #[tokio::test]
     async fn test_cols_to_json() {
