@@ -11,8 +11,9 @@ use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use awscreds::Credentials;
 use aws_config::{BehaviorVersion, Region};
 use aws_sdk_s3::Client;
-use datafusion::arrow::array::{ArrayBuilder, ArrayRef, AsArray, BooleanArray, Int32Array, StringArray, StructArray};
-use datafusion::arrow::datatypes::{DataType, Field, Fields, Int32Type, Schema, SchemaBuilder};
+use datafusion::arrow::array::{as_struct_array, ArrayBuilder, ArrayDataBuilder, ArrayRef, AsArray, BooleanArray, Int32Array, Int32Builder, StringArray, StructArray};
+use datafusion::arrow::datatypes::{DataType, Field, Fields, Int32Type, Schema, SchemaBuilder, Utf8Type};
+use datafusion::arrow::ipc::Utf8Builder;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::arrow;
@@ -175,9 +176,7 @@ pub async fn join_dfs_example() -> Result<()> {
 pub async fn get_primary_key(col_name: Option<&str>, max: i32) -> Result<RecordBatch> {
     let col_name = col_name.unwrap_or("primary_key");
     let data: ArrayRef = Arc::new(Int32Array::from_iter(0..max));
-    let record_batch = RecordBatch::try_from_iter(vec![
-      (col_name, data),
-    ])?;
+    let record_batch = RecordBatch::try_from_iter(vec![(col_name, data)])?;
 
     Ok(record_batch)
 }
@@ -383,37 +382,184 @@ pub fn record_batches_to_json_rows() -> Result<()> {
     Ok(())
 }
 
-pub async fn df_cols_to_struct(ctx: SessionContext, df: DataFrame, cols: &[&str]) -> Result<StructArray> {
-    let df_cols_to_struct = df.select_columns(cols)?;
-    let fields = df_cols_to_struct.schema().fields().to_owned();
-    println!("{:?}", fields);
-    let mut arrays = vec![];
-    let batches = df_cols_to_struct.collect().await?;
-    let mut data_builders: Vec<Box<dyn ArrayBuilder>> = vec![];
-    println!("batches len: {}", batches.len());
-    for batch in batches {
-        // let mut tmp_arr = vec![];
-        // for i in 0..cols.len() - 1 {
-        //     let data = 
-        // }
-        // let mut arr = vec![];
+// pub async fn df_cols_to_struct(ctx: SessionContext, df: DataFrame, cols: &[&str]) -> Result<DataFrame> {
+//     let df_cols_to_struct = df.select_columns(cols)?;
+//     let fields = df_cols_to_struct.schema().fields().to_owned();
+//     println!("{:?}", fields);
+//     let mut arrays = vec![];
+//     let batches = df_cols_to_struct.collect().await?;
+//     // let mut data_builders: Vec<Box<dyn ArrayBuilder>> = vec![];
+//     println!("batches len: {}", batches.len());
+//     let mut res = HashMap::new();
+//     for (idx, batch) in batches.iter().enumerate() {
+//         let mut b = vec![];
+//         for i in 0..batch.num_columns() {
+//             let array = batch.column(i);
+//             // let struct_arr = as_struct_array(array);
+//             // arrays.push(array);
+//             b.push(array);
+//         }
+//         res.insert(idx, b);
+//     }
+//     // println!("arr len: {}", arrays.len());
+//     // println!("{:?}", arrays);
+//     // println!("res len: {}", res.len());
+//     // println!("{:?}", res);
+//     let mut primary_keys = vec![];
+//     let mut idx = 1u32;
+//     for i in res.keys().sorted() {
+//         println!("#{idx} {:?}", res[i]);
+//         // pk.push(*i as i32);
+//         // for arr in &res[i] {
+//         //     let x = arr;
+//         // }
+//         primary_keys.push(*i);
 
-        // let array = batch.columns();
-        // println!("arr: {:?}", array);
-        // arrays.extend(array);
-        // #2 cols in batch
-        for i in 0..batch.num_columns() {
-            let array = batch.column(i);
-            
-        }
+//         let arr = res.clone();
+//         let mut idx = 0usize;
+        
+//         let xs = res[i].clone().get(0).unwrap().to_data();
+//         let builder = xs.into_builder();
+
+
+//         idx += 1;
+//     }
+
+//     let sruct_array = StructArray::new(fields, arrays, None);
+
+//     // let df = ctx.read_empty()?;
+
+//     Ok(sruct_array)
+// }
+
+pub async fn demo_struct() -> Result<()> {
+    let ctx = SessionContext::new();
+    let schema = Schema::new(vec![
+        Field::new("id", DataType::Int32, false),
+        Field::new("name", DataType::Utf8, true),
+        Field::new("data", DataType::Int32, true),
+    ]);
+    let batch = RecordBatch::try_new(
+        schema.clone().into(),
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])),
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+            Arc::new(Int32Array::from(vec![42, 43, 44])),
+        ],
+    )?;
+    let df = ctx.read_batch(batch.clone())?;
+
+    let df_to_struct = df.clone().select_columns(&["id", "name", "data"])?;
+    let batches = df_to_struct.collect().await?;
+    let mut ids = vec![];
+    let mut names = vec![];
+    let mut data_all = vec![];
+    for batch in &batches {
+        let xs = batch.columns();
+        let id = xs.get(0).unwrap().as_any().downcast_ref::<Int32Array>().unwrap().iter().collect::<Vec<_>>();
+        let name = xs.get(1).unwrap().as_any().downcast_ref::<StringArray>().unwrap().iter().collect::<Vec<_>>();
+        let data = xs.get(2).unwrap().as_any().downcast_ref::<Int32Array>().unwrap().iter().collect::<Vec<_>>();
+        ids.extend(id);
+        names.extend(name);
+        data_all.extend(data);
     }
-    println!("arr len: {}", arrays.len());
-    // println!("{:?}", arrays);
-    let sruct_array = StructArray::new(fields, arrays, None);
 
-    // let df = ctx.read_empty()?;
+    let schema = Schema::new(vec![
+        Field::new("id2", DataType::Int32, false),
+        Field::new("metadata", DataType::Struct(Fields::from(vec![
+                Field::new("name", DataType::Utf8, false), 
+                Field::new("data", DataType::Int32, false),
+            ])), false),
+        ]
+    );
+    let ids = Int32Array::from(ids);
+    let struct_array = StructArray::from(vec![
+        (
+            Arc::new(Field::new("name", DataType::Utf8, false)), 
+            Arc::new(StringArray::from(names)) as ArrayRef,
+        ),
+        (
+            Arc::new(Field::new("data", DataType::Int32, false)), 
+            Arc::new(Int32Array::from(data_all)) as ArrayRef,
+        ),
+    ]);
+    let batch = RecordBatch::try_new(
+        schema.clone().into(),
+        vec![
+            Arc::new(ids),
+            Arc::new(struct_array),
+        ],
+    )?;
+    let df_struct = ctx.read_batch(batch)?;
 
-    Ok(sruct_array)
+    let res = df
+        .join(df_struct, JoinType::Inner, &["id"], &["id2"], None)?
+        .select_columns(&["id", "metadata"])?;
+
+    res.show().await?;
+
+    Ok(())
+}
+
+pub async fn df_cols_to_struct_test(ctx: SessionContext, df: DataFrame) -> Result<DataFrame> {
+    let cols = vec!["id", "name", "data"];
+    let df_cols_to_struct = df.clone().select_columns(&cols)?;
+
+    let batches = df_cols_to_struct.collect().await?;
+    let mut pkeys = vec![];
+    let mut names = vec![];
+    let mut data_all = vec![];
+    for batch in &batches {
+        let xs = batch.columns();
+        let pk = xs.get(0).unwrap().as_any().downcast_ref::<Int32Array>().unwrap().iter().collect::<Vec<_>>();
+        let name = xs.get(1).unwrap().as_any().downcast_ref::<StringArray>().unwrap().iter().collect::<Vec<_>>();
+        let data = xs.get(2).unwrap().as_any().downcast_ref::<Int32Array>().unwrap().iter().collect::<Vec<_>>();
+        pkeys.extend(pk);
+        names.extend(name);
+        data_all.extend(data);
+    }
+
+    let schema = Schema::new(vec![
+        Field::new("id2", DataType::Int32, false),
+        Field::new("metadata", DataType::Struct(Fields::from(vec![
+                Field::new("name", DataType::Utf8, false), 
+                Field::new("data", DataType::Int32, false),
+            ])), false),
+        ]
+    );
+    let ids = Int32Array::from(pkeys);
+    let struct_array = StructArray::from(vec![
+        (
+            Arc::new(Field::new("name", DataType::Utf8, false)),
+            Arc::new(StringArray::from(names)) as ArrayRef,
+        ),
+        (
+            Arc::new(Field::new("data", DataType::Int32, false)),
+            Arc::new(Int32Array::from(data_all)) as ArrayRef,
+        ),
+    ]);
+    let batch = RecordBatch::try_new(
+        schema.clone().into(),
+        vec![
+            Arc::new(ids),
+            Arc::new(struct_array),
+        ],
+    )?;
+    let df_struct = ctx.read_batch(batch)?;
+
+    let res = df
+        .join(df_struct, JoinType::Inner, &["id"], &["id2"], None)?
+        .select_columns(&["id", "foo", "metadata"])?;
+
+    Ok(res)
+}
+
+pub async fn df_cols_to_struct_dev(ctx: SessionContext, df: DataFrame, cols: &[&str]) -> Result<DataFrame> {
+    
+
+    let res = ctx.read_empty()?;
+
+    Ok(res)
 }
 
 pub async fn df_cols_to_json_example() -> Result<()> {
@@ -509,12 +655,21 @@ pub async fn select_all_exclude(df: DataFrame, cols_to_exclude: &[&str]) -> Resu
         .fields()
         .iter()
         .map(|x| x.name().as_str())
-        .filter(|x| cols_to_exclude.iter().find(|col| col.contains(x)).is_none())
+        .filter(|x| cols_to_exclude.iter().find(|col| col.eq(&x)).is_none())
         .collect::<Vec<_>>();
     
     let res = df.clone().select_columns(&columns)?;
 
     Ok(res)
+}
+
+pub fn get_column_names(df: DataFrame) -> Vec<String> {
+    df
+        .schema()
+        .fields()
+        .iter()
+        .map(|x| x.name().to_string())
+        .collect::<Vec<_>>()
 }
 
 // create json like string column, df should have primary_key with int type
@@ -644,11 +799,15 @@ pub async fn df_struct_example1() -> Result<DataFrame> {
         Field::new("id", DataType::Int32, false),
         Field::new("metadata", DataType::Struct(Fields::from(vec![
                 Field::new("name", DataType::Utf8, false), 
-                Field::new("data", DataType::Int32, false)
+                Field::new("data", DataType::Int32, false),
+                Field::new("new", DataType::Int32, false)
             ])), false),
-    ]);
+        ]
+    );
 
-    let data = StructArray::from(vec![
+    let ids = Int32Array::from(vec![1, 2, 3]);
+
+    let struct_array = StructArray::from(vec![
         (
             Arc::new(Field::new("name", DataType::Utf8, false)),
             Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef,
@@ -657,13 +816,17 @@ pub async fn df_struct_example1() -> Result<DataFrame> {
             Arc::new(Field::new("data", DataType::Int32, false)),
             Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef,
         ),
+        (
+            Arc::new(Field::new("new", DataType::Int32, false)),
+            Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef,
+        ),
     ]);
 
     let batch = RecordBatch::try_new(
         schema.clone().into(),
         vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(data),
+            Arc::new(ids),
+            Arc::new(struct_array),
         ],
     )?;
 
@@ -990,7 +1153,29 @@ mod tests {
     use datafusion::assert_batches_eq;
 
     #[test]
-    fn test_cols_to_json_str() {
+    fn test_get_column_names() {
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("name", DataType::Utf8, true),
+            Field::new("data", DataType::Int32, true),
+        ]);
+        let batch = RecordBatch::try_new(
+            schema.clone().into(),
+            vec![
+                Arc::new(Int32Array::from(vec![1, 2, 3])),
+                Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+                Arc::new(Int32Array::from(vec![42, 43, 44])),
+            ],
+        ).unwrap();
+    
+        let ctx = SessionContext::new();
+        let df = ctx.read_batch(batch.clone()).unwrap();
+        let cols = get_column_names(df);
+        assert_eq!(cols, vec!["id", "name", "data"]);
+    }
+
+    #[test]
+    fn test_convert_cols_to_json() {
         let schema = Schema::new(vec![Field::new("a", DataType::Int32, false)]);
         let a = Int32Array::from(vec![1, 2, 3]);
         let batch = RecordBatch::try_new(Arc::new(schema), vec![Arc::new(a)]).unwrap();
