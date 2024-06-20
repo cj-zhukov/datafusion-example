@@ -11,7 +11,7 @@ use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use awscreds::Credentials;
 use aws_config::{BehaviorVersion, Region};
 use aws_sdk_s3::Client;
-use datafusion::arrow::array::{as_struct_array, ArrayBuilder, ArrayDataBuilder, ArrayRef, AsArray, BooleanArray, Int32Array, Int32Builder, StringArray, StructArray};
+use datafusion::arrow::array::{as_struct_array, ArrayBuilder, ArrayDataBuilder, ArrayRef, AsArray, BooleanArray, Int32Array, Int32Builder, ListArray, StringArray, StructArray};
 use datafusion::arrow::datatypes::{DataType, Field, Fields, Int32Type, Schema, SchemaBuilder, Utf8Type};
 use datafusion::arrow::ipc::Utf8Builder;
 use datafusion::arrow::record_batch::RecordBatch;
@@ -790,6 +790,37 @@ pub async fn add_col_to_df_example() -> Result<()> {
 
 
     Ok(())
+}
+
+pub fn df_list_arr_example() -> Result<DataFrame> {
+    let ctx = SessionContext::new();
+    let schema = Schema::new(vec![
+        Field::new("id", DataType::Int32, false),
+        Field::new("name", DataType::Utf8, true),
+        Field::new("data", DataType::Int32, true),
+        Field::new("list", DataType::List(Arc::new(Field::new("item", DataType::Int32, true))), true),
+    ]);
+
+    let my_list_data = vec![
+        Some(vec![Some(0), Some(1), Some(2)]),
+        None,
+        Some(vec![Some(6), Some(7)]),
+    ];
+    let list_array = ListArray::from_iter_primitive::<Int32Type, _, _>(my_list_data);
+
+    let batch = RecordBatch::try_new(
+        schema.into(),
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])),
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+            Arc::new(Int32Array::from(vec![42, 43, 44])),
+            Arc::new(list_array),
+        ],
+    )?;
+
+    let res = ctx.read_batch(batch)?;
+
+    Ok(res)
 }
 
 pub async fn df_struct_example1() -> Result<DataFrame> {
