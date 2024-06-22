@@ -1,4 +1,5 @@
 pub mod scalarvalue;
+pub mod examples;
 
 use std::collections::HashMap;
 use std::io::{Cursor, Write};
@@ -12,12 +13,10 @@ use awscreds::Credentials;
 use aws_config::{BehaviorVersion, Region};
 use aws_sdk_s3::Client;
 use datafusion::arrow::compute::concat;
-use datafusion::arrow::array::{ArrayRef, BooleanArray, Int32Array, ListArray, StringArray, StructArray};
-use datafusion::arrow::datatypes::{DataType, Field, Fields, Int32Type, Schema};
+use datafusion::arrow::array::{ArrayRef, Int32Array, StringArray, StructArray};
+use datafusion::arrow::datatypes::{DataType, Field, Fields, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::dataframe::DataFrameWriteOptions;
-use datafusion::arrow;
-use datafusion::scalar::ScalarValue;
 use datafusion::prelude::*;
 use object_store::aws::AmazonS3Builder;
 use parquet::arrow::{AsyncArrowWriter, ParquetRecordBatchStreamBuilder};
@@ -29,63 +28,6 @@ use tokio_stream::StreamExt;
 use futures_util::TryStreamExt;
 use url::Url;
 
-pub async fn assert_example() -> Result<()> {
-    let ctx = SessionContext::new();
-
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.clone().into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )?;
-    let df = ctx.read_batch(batch.clone())?;
-    df.clone().show().await?;
-    let rows_count = df.clone().count().await?;
-    let columns_count = df.clone().schema().field_names().len();
-    assert_eq!(rows_count, 3);
-    assert_eq!(columns_count, 2);
-
-    let results: Vec<RecordBatch> = df.collect().await?;
-    let pretty_results = arrow::util::pretty::pretty_format_batches(&results)?.to_string();
-    let expected = vec![
-        "+----+------+",
-        "| id | data |",
-        "+----+------+",
-        "| 1  | 42   |",
-        "| 2  | 43   |",
-        "| 3  | 44   |",
-        "+----+------+",
-    ];
-    assert_eq!(pretty_results.trim().lines().collect::<Vec<_>>(), expected);
-
-    Ok(())
-}
-
-pub async fn join_dfs_example() -> Result<()> {
-    let df1 = get_df().await?;
-    let df2 = get_df2().await?.with_column_renamed("id", "id_tojoin")?;
-    let df = df1.clone().join(df2.clone(), JoinType::Inner, &["id"], &["id_tojoin"], None)?;
-
-    // select all columns from joined df except tojoin
-    let columns = df
-        .schema()
-        .fields()
-        .iter()
-        .map(|x| x.name().as_str())
-        .filter(|x| !x.contains("tojoin"))
-        .collect::<Vec<_>>();
-
-    let res = df.clone().select_columns(&columns)?;
-    res.show().await?;
-
-    Ok(())
-}
-
 // add auto-increment column to df
 pub async fn add_pk_to_df(ctx: SessionContext, df: DataFrame, col_name: &str) -> Result<DataFrame> {
     let schema = df.schema().clone();
@@ -93,7 +35,6 @@ pub async fn add_pk_to_df(ctx: SessionContext, df: DataFrame, col_name: &str) ->
     let batches = batches.iter().map(|x| x).collect::<Vec<_>>();
     let field_num = schema.fields().len();
     let mut arrays = Vec::with_capacity(field_num);
-    // create array per column 
     for i in 0..field_num {
         let array = batches
             .iter()
@@ -106,189 +47,13 @@ pub async fn add_pk_to_df(ctx: SessionContext, df: DataFrame, col_name: &str) ->
     let max_len = arrays.get(0).unwrap().len();
     let pks: ArrayRef = Arc::new(Int32Array::from_iter(0..max_len as i32));
     arrays.push(pks);
+    
     let schema_pks = Schema::new(vec![Field::new(col_name, DataType::Int32, true)]);
-
     let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_pks])?;
     let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
     let res = ctx.read_batch(batch)?;
 
     Ok(res)
-}
-
-pub async fn get_df() -> Result<DataFrame> {
-    let ctx = SessionContext::new();
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.clone().into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-        ],
-    )?;
-    let df = ctx.read_batch(batch.clone())?;
-
-    Ok(df)
-}
-
-pub async fn get_df2() -> Result<DataFrame> {
-    let ctx = SessionContext::new();
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.clone().into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )?;
-    let df = ctx.read_batch(batch.clone())?;
-
-    Ok(df)
-}
-
-pub async fn get_df3() -> Result<DataFrame> {
-    let ctx = SessionContext::new();
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("pkey", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, true),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.clone().into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(StringArray::from(vec![None, None, Some("baz")])),
-            Arc::new(Int32Array::from(vec![None, None, Some(44)])),
-        ],
-    )?;
-    let df = ctx.read_batch(batch.clone())?;
-
-    Ok(df)
-}
-
-pub async fn simple() -> Result<()> {
-    // define a schema
-    let schema = Arc::new(Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, false),
-    ]));
-
-    // define data
-    let batch = RecordBatch::try_new(
-        schema,
-        vec![
-            Arc::new(Int32Array::from(vec![1, 10, 100])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-        ],
-    )?;
-
-    // declare a new context. In spark API, this corresponds to a new spark SQLsession
-    let ctx = SessionContext::new();
-
-    // declare a table in memory. In spark API, this corresponds to createDataFrame(...)
-    ctx.register_batch("t", batch)?;
-    let df = ctx.table("t").await?;
-
-    // filter
-    // let df = ctx.
-    //     sql("SELECT * FROM t \
-    //         WHERE id > 10").await?;        
-  
-    df.show().await?;
-
-    Ok(())
-}
-
-pub async fn join() -> Result<()> {
-    let schema = Arc::new(Schema::new(vec![
-        Field::new("id", DataType::Utf8, false),
-        Field::new("name", DataType::Int32, false),
-    ]));
-
-    let batch1 = RecordBatch::try_new(
-        schema.clone(),
-        vec![
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-            Arc::new(Int32Array::from(vec![1, 10, 100])),
-        ],
-    )?;
-
-    let batch2 = RecordBatch::try_new(
-        schema.clone(),
-        vec![
-            Arc::new(StringArray::from(vec!["foo", "foo", "baz"])),
-            Arc::new(Int32Array::from(vec![1, 10, 100])),
-        ],
-    )?;
-
-    let ctx = SessionContext::new();
-
-    ctx.register_batch("t1", batch1)?;
-    ctx.register_batch("t2", batch2)?;
-    let df1 = ctx.table("t1").await?;
-    let df2 = ctx.table("t2").await?
-        .select(vec![
-            col("id").alias("id2"),
-            col("name").alias("name2")])?;
-
-    let joined = df1
-        .join(df2, JoinType::Inner, &["id"], &["id2"], None)?
-        .select_columns(&["id", "name", "name2"])?;
-
-    joined.show().await?;
-    
-    Ok(())
-}
-
-pub async fn join_sql() -> Result<()> {
-    let schema = Arc::new(Schema::new(vec![
-        Field::new("id", DataType::Utf8, false),
-        Field::new("name", DataType::Int32, false),
-    ]));
-
-    let batch1 = RecordBatch::try_new(
-        schema.clone(),
-        vec![
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-            Arc::new(Int32Array::from(vec![1, 10, 100])),
-        ],
-    )?;
-
-    let batch2 = RecordBatch::try_new(
-        schema.clone(),
-        vec![
-            Arc::new(StringArray::from(vec!["foo", "foo", "baz"])),
-            Arc::new(Int32Array::from(vec![1, 10, 100])),
-        ],
-    )?;
-
-    let ctx = SessionContext::new();
-
-    ctx.register_batch("t1", batch1)?;
-    ctx.register_batch("t2", batch2)?;
-
-    // example how to except the same col id 
-    // let res = ctx
-    //     .sql("select t1.*, t2.* except(id) \
-    //     from t1 inner join t2 \
-    //     on t1.id = t2.id").await?;
-
-    let res = ctx
-        .sql("select t1.id as id1, t1.name as name1, t2.name as name2 \
-            from t1 \
-            inner join t2 on t1.id = t2.id \
-            where t1.id = 'foo'").await?;
-
-    res.show().await?;
-    
-    Ok(())
 }
 
 pub fn record_batches_to_json_rows() -> Result<()> {
@@ -310,125 +75,6 @@ pub fn record_batches_to_json_rows() -> Result<()> {
         let val_str = serde_json::to_string(&value).unwrap();
         println!("{}", val_str);
     }
-
-    Ok(())
-}
-
-// pub async fn df_cols_to_struct(ctx: SessionContext, df: DataFrame, cols: &[&str]) -> Result<DataFrame> {
-//     let df_cols_to_struct = df.select_columns(cols)?;
-//     let fields = df_cols_to_struct.schema().fields().to_owned();
-//     println!("{:?}", fields);
-//     let mut arrays = vec![];
-//     let batches = df_cols_to_struct.collect().await?;
-//     // let mut data_builders: Vec<Box<dyn ArrayBuilder>> = vec![];
-//     println!("batches len: {}", batches.len());
-//     let mut res = HashMap::new();
-//     for (idx, batch) in batches.iter().enumerate() {
-//         let mut b = vec![];
-//         for i in 0..batch.num_columns() {
-//             let array = batch.column(i);
-//             // let struct_arr = as_struct_array(array);
-//             // arrays.push(array);
-//             b.push(array);
-//         }
-//         res.insert(idx, b);
-//     }
-//     // println!("arr len: {}", arrays.len());
-//     // println!("{:?}", arrays);
-//     // println!("res len: {}", res.len());
-//     // println!("{:?}", res);
-//     let mut primary_keys = vec![];
-//     let mut idx = 1u32;
-//     for i in res.keys().sorted() {
-//         println!("#{idx} {:?}", res[i]);
-//         // pk.push(*i as i32);
-//         // for arr in &res[i] {
-//         //     let x = arr;
-//         // }
-//         primary_keys.push(*i);
-
-//         let arr = res.clone();
-//         let mut idx = 0usize;
-        
-//         let xs = res[i].clone().get(0).unwrap().to_data();
-//         let builder = xs.into_builder();
-
-
-//         idx += 1;
-//     }
-
-//     let sruct_array = StructArray::new(fields, arrays, None);
-
-//     // let df = ctx.read_empty()?;
-
-//     Ok(sruct_array)
-// }
-
-pub async fn demo_struct() -> Result<()> {
-    let ctx = SessionContext::new();
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, true),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.clone().into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )?;
-    let df = ctx.read_batch(batch.clone())?;
-
-    let df_to_struct = df.clone().select_columns(&["id", "name", "data"])?;
-    let batches = df_to_struct.collect().await?;
-    let mut ids = vec![];
-    let mut names = vec![];
-    let mut data_all = vec![];
-    for batch in &batches {
-        let xs = batch.columns();
-        let id = xs.get(0).unwrap().as_any().downcast_ref::<Int32Array>().unwrap().iter().collect::<Vec<_>>();
-        let name = xs.get(1).unwrap().as_any().downcast_ref::<StringArray>().unwrap().iter().collect::<Vec<_>>();
-        let data = xs.get(2).unwrap().as_any().downcast_ref::<Int32Array>().unwrap().iter().collect::<Vec<_>>();
-        ids.extend(id);
-        names.extend(name);
-        data_all.extend(data);
-    }
-
-    let schema = Schema::new(vec![
-        Field::new("id2", DataType::Int32, false),
-        Field::new("metadata", DataType::Struct(Fields::from(vec![
-                Field::new("name", DataType::Utf8, false), 
-                Field::new("data", DataType::Int32, false),
-            ])), false),
-        ]
-    );
-    let ids = Int32Array::from(ids);
-    let struct_array = StructArray::from(vec![
-        (
-            Arc::new(Field::new("name", DataType::Utf8, false)), 
-            Arc::new(StringArray::from(names)) as ArrayRef,
-        ),
-        (
-            Arc::new(Field::new("data", DataType::Int32, false)), 
-            Arc::new(Int32Array::from(data_all)) as ArrayRef,
-        ),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.clone().into(),
-        vec![
-            Arc::new(ids),
-            Arc::new(struct_array),
-        ],
-    )?;
-    let df_struct = ctx.read_batch(batch)?;
-
-    let res = df
-        .join(df_struct, JoinType::Inner, &["id"], &["id2"], None)?
-        .select_columns(&["id", "metadata"])?;
-
-    res.show().await?;
 
     Ok(())
 }
@@ -486,99 +132,6 @@ pub async fn df_cols_to_struct_test(ctx: SessionContext, df: DataFrame) -> Resul
     Ok(res)
 }
 
-// pub async fn df_cols_to_struct_dev(ctx: SessionContext, df: DataFrame, cols: &[&str]) -> Result<DataFrame> {
-//     let res = ctx.read_empty()?;
-
-//     Ok(res)
-// }
-
-pub async fn df_cols_to_json_example() -> Result<()> {
-    let ctx = SessionContext::new();
-    let schema1 = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, true),
-    ]);
-    let batch1 = RecordBatch::try_new(
-        schema1.clone().into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-        ],
-    )?;
-    let df1 = ctx.read_batch(batch1.clone())?;
-
-    let schema2 = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch2 = RecordBatch::try_new(
-        schema2.clone().into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )?;
-    let df2 = ctx
-        .read_batch(batch2.clone())?
-        .with_column_renamed("id", "id2")?;
-
-    let df = df1
-        .join(df2, JoinType::Inner, &["id"], &["id2"], None)?
-        .select_columns(&["id", "name", "data"])?;
-    df.clone().show().await?;
-
-    let df_cols_for_json = df.clone().select_columns(&["name", "data", "id"])?;
-    // df_cols_for_json.show().await?;
-    let mut stream = df_cols_for_json.clone().execute_stream().await.context("could not create stream")?;
-    let buf = Vec::new();
-    let mut writer = arrow_json::ArrayWriter::new(buf);
-    while let Some(batch) = stream.next().await.transpose()? {
-        writer.write_batches(&[&batch])?;
-    }
-    writer.finish()?;
-    let json_data = writer.into_inner();
-    let json_rows: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice())?;
-    let mut res = HashMap::new();
-    for mut json in json_rows {
-        // let primary_key = json["id"].clone();
-        let primary_key = json.remove("id").unwrap().to_string().parse::<i32>()?;
-        // println!("pkey: {:?}", primary_key);
-        // println!("json: {:?}", json);
-        let m = HashMap::from([(primary_key, json)]);
-        res.extend(m);
-    }
-    println!("res:{:?}", res);
-
-    let mut primary_keys = vec![];
-    let mut data_all = vec![];
-    for i in res.keys().sorted() {
-        // println!("row: {:?}", res[i]);
-        primary_keys.push(*i);
-        let row = res[i].clone();
-        let str_row = serde_json::to_string(&row)?;
-        data_all.push(str_row);
-    }
-
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("metadata", DataType::Utf8, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.clone().into(),
-        vec![
-            Arc::new(Int32Array::from(primary_keys)),
-            Arc::new(StringArray::from(data_all)),
-        ],
-    )?;
-    let df_to_json = ctx.read_batch(batch.clone())?;
-    df_to_json.clone().show().await?;
-
-    let res = df.join(df_to_json, JoinType::Inner, &["id"], &["id"], None)?;
-    res.show().await?;
-
-    Ok(())
-}
-
 // select all columns except cols_to_exclude
 pub async fn select_all_exclude(df: DataFrame, cols_to_exclude: &[&str]) -> Result<DataFrame> {
     let columns = df
@@ -601,6 +154,76 @@ pub fn get_column_names(df: DataFrame) -> Vec<String> {
         .iter()
         .map(|x| x.name().to_string())
         .collect::<Vec<_>>()
+}
+
+// create json like string column
+pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
+    let pk = "pk";
+    let df = add_pk_to_df(ctx.clone(), df, pk).await?;
+    let mut cols_new = cols.iter().map(|x| x.to_owned()).collect::<Vec<_>>();
+    cols_new.push(pk);
+    
+    let df_cols_for_json = df.clone().select_columns(&cols_new)?;
+    let mut stream = df_cols_for_json.clone().execute_stream().await.context("could not create stream")?;
+    let buf = Vec::new();
+    let mut writer = arrow_json::ArrayWriter::new(buf);
+    while let Some(batch) = stream.next().await.transpose()? {
+        // writer.write_batches(&[&batch])?;
+        writer.write(&batch)?;
+    }
+    writer.finish()?;
+    let json_data = writer.into_inner();
+    let json_rows: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice())?;
+    let mut res = HashMap::new();
+    for mut json in json_rows {
+        let pk = json.remove(pk).unwrap().to_string().parse::<i32>()?;
+        res.extend(HashMap::from([(pk, json)]));
+    }
+    // println!("res:{:?}", res)
+    let mut primary_keys = vec![];
+    let mut data_all = vec![];
+    for i in res.keys().sorted() {
+        primary_keys.push(*i);
+        let row = res[i].clone();
+        // add Option type for json string like col
+        let str_row = if row.len() > 0 {
+            let str_row = serde_json::to_string(&row)?;
+            Some(str_row)
+        } else {
+            None
+        };
+        data_all.push(str_row);
+    }
+
+    let mut right_cols = pk.to_string();
+    right_cols.push_str("tojoin");
+    let schema = Schema::new(vec![
+        Field::new(right_cols.clone(), DataType::Int32, false),
+        Field::new(new_col.unwrap_or("metadata"), DataType::Utf8, true),
+    ]);
+    let batch = RecordBatch::try_new(
+        schema.clone().into(),
+        vec![
+            Arc::new(Int32Array::from(primary_keys)),
+            Arc::new(StringArray::from(data_all)),
+        ],
+    )?;
+    let df_to_json = ctx.read_batch(batch.clone())?;
+    
+    let res = df.join(df_to_json, JoinType::Inner, &[pk], &[&right_cols], None)?;
+    
+    let columns = res
+        .schema()
+        .fields()
+        .iter()
+        .map(|x| x.name().as_str())
+        .filter(|x| !x.contains("tojoin"))
+        .filter(|x| cols_new.iter().find(|col| col.eq(&x)).is_none())
+        .collect::<Vec<_>>();
+
+    let res = res.clone().select_columns(&columns)?;
+
+    Ok(res)
 }
 
 // create json like string column, df should have primary_key with int type
@@ -678,276 +301,6 @@ pub async fn df_cols_to_json2(ctx: SessionContext, df: DataFrame, cols: &[&str],
     let res = res.clone().select_columns(&columns)?;
 
     Ok(res)
-}
-
-// create json like string column
-pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
-    let pk = "pk";
-    let df = add_pk_to_df(ctx.clone(), df, pk).await?;
-    let mut cols_new = cols.iter().map(|x| x.to_owned()).collect::<Vec<_>>();
-    cols_new.push(pk);
-    
-    let df_cols_for_json = df.clone().select_columns(&cols_new)?;
-    let mut stream = df_cols_for_json.clone().execute_stream().await.context("could not create stream")?;
-    let buf = Vec::new();
-    let mut writer = arrow_json::ArrayWriter::new(buf);
-    while let Some(batch) = stream.next().await.transpose()? {
-        // writer.write_batches(&[&batch])?;
-        writer.write(&batch)?;
-    }
-    writer.finish()?;
-    let json_data = writer.into_inner();
-    let json_rows: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice())?;
-    let mut res = HashMap::new();
-    for mut json in json_rows {
-        let pk = json.remove(pk).unwrap().to_string().parse::<i32>()?;
-        res.extend(HashMap::from([(pk, json)]));
-    }
-    // println!("res:{:?}", res)
-    let mut primary_keys = vec![];
-    let mut data_all = vec![];
-    for i in res.keys().sorted() {
-        primary_keys.push(*i);
-        let row = res[i].clone();
-        // add Option type for json string like col
-        let str_row = if row.len() > 0 {
-            let str_row = serde_json::to_string(&row)?;
-            Some(str_row)
-        } else {
-            None
-        };
-        data_all.push(str_row);
-    }
-
-    let mut right_cols = pk.to_string();
-    right_cols.push_str("tojoin");
-    let schema = Schema::new(vec![
-        Field::new(right_cols.clone(), DataType::Int32, false),
-        Field::new(new_col.unwrap_or("metadata"), DataType::Utf8, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.clone().into(),
-        vec![
-            Arc::new(Int32Array::from(primary_keys)),
-            Arc::new(StringArray::from(data_all)),
-        ],
-    )?;
-    let df_to_json = ctx.read_batch(batch.clone())?;
-    
-    let res = df.join(df_to_json, JoinType::Inner, &[pk], &[&right_cols], None)?;
-    
-    let columns = res
-        .schema()
-        .fields()
-        .iter()
-        .map(|x| x.name().as_str())
-        .filter(|x| !x.contains("tojoin"))
-        .filter(|x| cols_new.iter().find(|col| col.eq(&x)).is_none())
-        .collect::<Vec<_>>();
-
-    let res = res.clone().select_columns(&columns)?;
-
-    Ok(res)
-}
-
-pub async fn add_col_to_df_example() -> Result<()> {
-    let ctx = SessionContext::new();
-
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.clone().into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )?;
-    let df = ctx.read_batch(batch.clone())?;
-    df.clone().show().await?;
-
-    // let new_col = vec!["foo", "bar", "baz"];
-    // let scalars = new_col.iter().map(|val| ScalarValue::Utf8(Some(val.to_string()))).collect::<Vec<_>>();
-    // let new_col = ScalarValue::new_list_from_iter(scalars.into_iter(), &DataType::Utf8);
-    // let _ = df.clone().with_column("new_col1", Expr::Literal(ScalarValue::new_utf8("foo")))?; // add one string for all columns
-    // let res = df.clone().with_column("new_col2", Expr::Literal(ScalarValue::List(new_col)))?; // add list
-    // res.show().await?;
-
-    // add column from vec doesn't work
-    // https://github.com/apache/arrow-datafusion/pull/9592
-    // let new_col = vec!["foo".to_string(), "bar".to_string(), "baz".to_string()];
-    // let exprs = new_col.iter().map(|val| lit(*val)).collect::<Vec<_>>();
-    // println!("exprs: {:?}", exprs);
-    // let res = df.with_column("new_col", Expr::Unnest(Unnest { expr: exprs }))?;
-    // let res = df.with_column("new_col", Expr::ScalarVariable(DataType::Utf8, new_col))?;
-    // res.show().await?;
-    /* 36 version -> 
-    Internal error: Unnest should be rewritten to LogicalPlan::Unnest before type coercion.
-    This was likely caused by a bug in DataFusion's code and we would welcome that you file an bug report in our issue tracker 
-    */
-    // 37 version -> Error: Error during planning: unnest() can only be applied to array, struct and null
-    // 38 version -> doesn't work pub expr: Box<Expr> in Unnest, but not vec<Epx>
-
-
-    Ok(())
-}
-
-pub fn df_list_arr_example() -> Result<DataFrame> {
-    let ctx = SessionContext::new();
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, true),
-        Field::new("data", DataType::Int32, true),
-        Field::new("list", DataType::List(Arc::new(Field::new("item", DataType::Int32, true))), true),
-    ]);
-
-    let my_list_data = vec![
-        Some(vec![Some(0), Some(1), Some(2)]),
-        None,
-        Some(vec![Some(6), Some(7)]),
-    ];
-    let list_array = ListArray::from_iter_primitive::<Int32Type, _, _>(my_list_data);
-
-    let batch = RecordBatch::try_new(
-        schema.into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-            Arc::new(list_array),
-        ],
-    )?;
-
-    let res = ctx.read_batch(batch)?;
-
-    Ok(res)
-}
-
-pub async fn df_struct_example1() -> Result<DataFrame> {
-    let ctx = SessionContext::new();
-
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("metadata", DataType::Struct(Fields::from(vec![
-                Field::new("name", DataType::Utf8, false), 
-                Field::new("data", DataType::Int32, false),
-                Field::new("new", DataType::Int32, false)
-            ])), false),
-        ]
-    );
-
-    let ids = Int32Array::from(vec![1, 2, 3]);
-
-    let struct_array = StructArray::from(vec![
-        (
-            Arc::new(Field::new("name", DataType::Utf8, false)),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef,
-        ),
-        (
-            Arc::new(Field::new("data", DataType::Int32, false)),
-            Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef,
-        ),
-        (
-            Arc::new(Field::new("new", DataType::Int32, false)),
-            Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef,
-        ),
-    ]);
-
-    let batch = RecordBatch::try_new(
-        schema.clone().into(),
-        vec![
-            Arc::new(ids),
-            Arc::new(struct_array),
-        ],
-    )?;
-
-    let res = ctx.read_batch(batch)?;
-
-    Ok(res)
-}
-
-pub async fn df_struct_example2() -> Result<()> {
-    let ctx = SessionContext::new();
-
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.clone().into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-        ],
-    )?;
-    let df = ctx.read_batch(batch.clone())?;
-
-    let data1 = Arc::new(BooleanArray::from(vec![false]));
-    let data2 = Arc::new(Int32Array::from(vec![42]));
-    let data3 = Arc::new(StringArray::from(vec!["foo"]));
-    let struct_array = StructArray::from(vec![
-        (
-            Arc::new(Field::new("x", DataType::Boolean, false)),
-            data1.clone() as ArrayRef,
-        ),
-        (
-            Arc::new(Field::new("y", DataType::Int32, false)),
-            data2.clone() as ArrayRef,
-        ),
-        (
-            Arc::new(Field::new("z", DataType::Utf8, false)),
-            data3.clone() as ArrayRef,
-        ),
-    ]);
-
-    let res = df.with_column("new_col", Expr::Literal(ScalarValue::Struct(struct_array.into())))?;
-    res.clone().show().await?;
-
-    Ok(())
-}
-
-// doesn't work for batch.len() > 1
-pub async fn add_col_to_df_simple() -> Result<()> {
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.clone().into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )?;
-    let ctx = SessionContext::new();
-    let df = ctx.read_batch(batch.clone())?;
-    df.show().await?;
-
-    let new_col = vec!["foo", "bar", "baz"]; 
-    let schema_new = Schema::new(vec![
-        Field::new("new_col", DataType::Utf8, false),
-    ]);
-    let batch_new = RecordBatch::try_new(
-        schema_new.clone().into(),
-        vec![
-            Arc::new(StringArray::from(new_col)),
-        ],
-    )?;
-    let x = batch.columns().to_vec();
-    let y = batch_new.columns().to_vec();
-    let mut columns = vec![];
-    columns.extend(x);
-    columns.extend(y);
-    // println!("{:?}", columns);
-
-    let schema_merged = Schema::try_merge(vec![schema, schema_new])?;
-    // println!("{:?}", schema_merged);
-
-    let batches = RecordBatch::try_new(schema_merged.into(), columns)?;
-    let res = ctx.read_batch(batches)?;
-
-    res.show().await?;
-
-    Ok(())
 }
 
 pub async fn get_aws_client(region: &str) -> Result<Client> {
