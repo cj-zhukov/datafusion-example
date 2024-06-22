@@ -11,9 +11,9 @@ use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use awscreds::Credentials;
 use aws_config::{BehaviorVersion, Region};
 use aws_sdk_s3::Client;
-use datafusion::arrow::array::{as_struct_array, ArrayBuilder, ArrayDataBuilder, ArrayRef, AsArray, BooleanArray, Int32Array, Int32Builder, ListArray, StringArray, StructArray};
-use datafusion::arrow::datatypes::{DataType, Field, Fields, Int32Type, Schema, SchemaBuilder, Utf8Type};
-use datafusion::arrow::ipc::Utf8Builder;
+use datafusion::arrow::compute::concat;
+use datafusion::arrow::array::{ArrayRef, BooleanArray, Int32Array, ListArray, StringArray, StructArray};
+use datafusion::arrow::datatypes::{DataType, Field, Fields, Int32Type, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::arrow;
@@ -22,7 +22,7 @@ use datafusion::prelude::*;
 use object_store::aws::AmazonS3Builder;
 use parquet::arrow::{AsyncArrowWriter, ParquetRecordBatchStreamBuilder};
 use serde_json::{Map, Value};
-use itertools::{izip, Itertools};
+use itertools::Itertools;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio_stream::StreamExt;
@@ -66,92 +66,6 @@ pub async fn assert_example() -> Result<()> {
     Ok(())
 }
 
-pub async fn dev() -> Result<()> {
-    let ctx = SessionContext::new();
-    let schema1 = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, true),
-    ]);
-    let batch1 = RecordBatch::try_new(
-        schema1.clone().into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-        ],
-    )?;
-    let df1 = ctx.read_batch(batch1.clone())?;
-
-    let schema2 = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch2 = RecordBatch::try_new(
-        schema2.clone().into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )?;
-    let df2 = ctx
-        .read_batch(batch2.clone())?
-        .with_column_renamed("id", "id2")?;
-
-    let df = df1
-        .join(df2, JoinType::Inner, &["id"], &["id2"], None)?
-        .select_columns(&["id", "name", "data"])?;
-    df.clone().show().await?;
-
-    let df_cols_for_json = df.clone().select_columns(&["name", "data", "id"])?;
-    let mut stream = df_cols_for_json.clone().execute_stream().await.context("could not create stream")?;
-    let buf = Vec::new();
-    let mut writer = arrow_json::ArrayWriter::new(buf);
-    while let Some(batch) = stream.next().await.transpose()? {
-        writer.write_batches(&[&batch])?;
-    }
-    writer.finish()?;
-    let json_data = writer.into_inner();
-    let json_rows: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice())?;
-    let mut res = HashMap::new();
-    for mut json in json_rows {
-        // let primary_key = json["id"].clone();
-        let primary_key = json.remove("id").unwrap().to_string().parse::<i32>()?;
-        // println!("pkey: {:?}", primary_key);
-        // println!("json: {:?}", json);
-        let m = HashMap::from([(primary_key, json)]);
-        res.extend(m);
-    }
-    println!("res:{:?}", res);
-
-    let mut primary_keys = vec![];
-    let mut data_all = vec![];
-    for i in res.keys().sorted() {
-        // println!("row: {:?}", res[i]);
-        primary_keys.push(*i);
-        let row = res[i].clone();
-        let str_row = serde_json::to_string(&row)?;
-        data_all.push(str_row);
-    }
-
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("metadata", DataType::Utf8, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.clone().into(),
-        vec![
-            Arc::new(Int32Array::from(primary_keys)),
-            Arc::new(StringArray::from(data_all)),
-        ],
-    )?;
-    let df_to_json = ctx.read_batch(batch.clone())?;
-    df_to_json.clone().show().await?;
-
-    let res = df.join(df_to_json, JoinType::Inner, &["id"], &["id"], None)?;
-    res.show().await?;
-
-    Ok(())
-}
-
 pub async fn join_dfs_example() -> Result<()> {
     let df1 = get_df().await?;
     let df2 = get_df2().await?.with_column_renamed("id", "id_tojoin")?;
@@ -172,13 +86,33 @@ pub async fn join_dfs_example() -> Result<()> {
     Ok(())
 }
 
-// add id column to df
-pub async fn get_primary_key(col_name: Option<&str>, max: i32) -> Result<RecordBatch> {
-    let col_name = col_name.unwrap_or("primary_key");
-    let data: ArrayRef = Arc::new(Int32Array::from_iter(0..max));
-    let record_batch = RecordBatch::try_from_iter(vec![(col_name, data)])?;
+// add auto-increment column to df
+pub async fn add_pk_to_df(ctx: SessionContext, df: DataFrame, col_name: &str) -> Result<DataFrame> {
+    let schema = df.schema().clone();
+    let batches = df.collect().await?;
+    let batches = batches.iter().map(|x| x).collect::<Vec<_>>();
+    let field_num = schema.fields().len();
+    let mut arrays = Vec::with_capacity(field_num);
+    // create array per column 
+    for i in 0..field_num {
+        let array = batches
+            .iter()
+            .map(|batch| batch.column(i).as_ref())
+            .collect::<Vec<_>>();
+        let array = concat(&array)?;
+        arrays.push(array);
+    }
+    
+    let max_len = arrays.get(0).unwrap().len();
+    let pks: ArrayRef = Arc::new(Int32Array::from_iter(0..max_len as i32));
+    arrays.push(pks);
+    let schema_pks = Schema::new(vec![Field::new(col_name, DataType::Int32, true)]);
 
-    Ok(record_batch)
+    let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_pks])?;
+    let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
+    let res = ctx.read_batch(batch)?;
+
+    Ok(res)
 }
 
 pub async fn get_df() -> Result<DataFrame> {
@@ -230,8 +164,6 @@ pub async fn get_df3() -> Result<DataFrame> {
         vec![
             Arc::new(Int32Array::from(vec![1, 2, 3])),
             Arc::new(Int32Array::from(vec![1, 2, 3])),
-            // Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-            // Arc::new(Int32Array::from(vec![42, 43, 44])),
             Arc::new(StringArray::from(vec![None, None, Some("baz")])),
             Arc::new(Int32Array::from(vec![None, None, Some(44)])),
         ],
@@ -554,13 +486,11 @@ pub async fn df_cols_to_struct_test(ctx: SessionContext, df: DataFrame) -> Resul
     Ok(res)
 }
 
-pub async fn df_cols_to_struct_dev(ctx: SessionContext, df: DataFrame, cols: &[&str]) -> Result<DataFrame> {
-    
+// pub async fn df_cols_to_struct_dev(ctx: SessionContext, df: DataFrame, cols: &[&str]) -> Result<DataFrame> {
+//     let res = ctx.read_empty()?;
 
-    let res = ctx.read_empty()?;
-
-    Ok(res)
-}
+//     Ok(res)
+// }
 
 pub async fn df_cols_to_json_example() -> Result<()> {
     let ctx = SessionContext::new();
@@ -649,6 +579,7 @@ pub async fn df_cols_to_json_example() -> Result<()> {
     Ok(())
 }
 
+// select all columns except cols_to_exclude
 pub async fn select_all_exclude(df: DataFrame, cols_to_exclude: &[&str]) -> Result<DataFrame> {
     let columns = df
         .schema()
@@ -1345,6 +1276,67 @@ mod tests {
                 "| 3  | baz  |",
                 "+----+------+",
           ],
+            &row3.collect().await.unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_add_pk_to_df() {
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("name", DataType::Utf8, true),
+            Field::new("data", DataType::Int32, true),
+        ]);
+        let batch = RecordBatch::try_new(
+            schema.clone().into(),
+            vec![
+                Arc::new(Int32Array::from(vec![1, 2, 3])),
+                Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+                Arc::new(Int32Array::from(vec![42, 43, 44])),
+            ],
+        ).unwrap();
+    
+        let ctx = SessionContext::new();
+        let df = ctx.read_batch(batch.clone()).unwrap();
+
+        let res = add_pk_to_df(ctx, df, "pk").await.unwrap();
+
+        assert_eq!(res.schema().fields().len(), 4); // columns count
+        assert_eq!(res.clone().count().await.unwrap(), 3); // rows count
+        
+        let row1 = res.clone().filter(col("id").eq(lit(1))).unwrap();
+        assert_batches_eq!(
+            &[
+                "+----+------+------+----+",
+                "| id | name | data | pk |",
+                "+----+------+------+----+",
+                "| 1  | foo  | 42   | 0  |",
+                "+----+------+------+----+",
+            ],
+            &row1.collect().await.unwrap()
+        );
+
+        let row2 = res.clone().filter(col("id").eq(lit(2))).unwrap();
+        assert_batches_eq!(
+            &[
+                "+----+------+------+----+",
+                "| id | name | data | pk |",
+                "+----+------+------+----+",
+                "| 2  | bar  | 43   | 1  |",
+                "+----+------+------+----+",
+            ],
+            &row2.collect().await.unwrap()
+        );
+
+        let row3 = res.clone().filter(col("id").eq(lit(3))).unwrap();
+        assert_batches_eq!(
+            &[
+                "+----+------+------+----+",
+                "| id | name | data | pk |",
+                "+----+------+------+----+",
+                "| 3  | baz  | 44   | 2  |",
+                "+----+------+------+----+",
+            ],
             &row3.collect().await.unwrap()
         );
     }
