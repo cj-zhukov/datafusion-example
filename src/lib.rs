@@ -157,6 +157,53 @@ pub fn get_column_names(df: DataFrame) -> Vec<String> {
 }
 
 // create json like string column
+pub async fn df_cols_to_json_adv(ctx: SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
+    let schema = df.schema().clone();
+    let batches = df.collect().await?;
+    let batches = batches.iter().map(|x| x).collect::<Vec<_>>();
+    let field_num = schema.fields().len();
+    let mut arrays = Vec::with_capacity(field_num);
+    for i in 0..field_num {
+        let array = batches
+            .iter()
+            .map(|batch| batch.column(i).as_ref())
+            .collect::<Vec<_>>();
+        let array = concat(&array)?;
+        arrays.push(array);
+    }
+
+    let batch = RecordBatch::try_new(schema.as_arrow().clone().into(), arrays.clone())?;
+    let df_prepared = ctx.read_batch(batch)?;
+    let batches = df_prepared.select_columns(cols)?.collect().await?;
+    let buf = Vec::new();
+    let mut writer = arrow_json::ArrayWriter::new(buf);
+    for batch in batches {
+        writer.write(&batch)?;
+    }
+    writer.finish()?;
+    let json_data = writer.into_inner();
+    let json_rows: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice())?;
+
+    let mut str_rows = vec![];
+    for json_row in &json_rows {
+        let str_row = serde_json::to_string(&json_row)?;
+        str_rows.push(str_row);
+    }
+
+    let new_col_arr: ArrayRef = Arc::new(StringArray::from(str_rows));
+    arrays.push(new_col_arr);
+
+    let schema_new_col = Schema::new(vec![Field::new(new_col.unwrap_or("metadata"), DataType::Utf8, true)]);
+    let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_new_col])?;
+    let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
+    let res = ctx.read_batch(batch)?;
+
+    let res = select_all_exclude(res, cols).await?;
+
+    Ok(res)
+}
+
+// create json like string column with joining
 pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
     let pk = "pk";
     let df = add_pk_to_df(ctx.clone(), df, pk).await?;
@@ -168,7 +215,6 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
     let buf = Vec::new();
     let mut writer = arrow_json::ArrayWriter::new(buf);
     while let Some(batch) = stream.next().await.transpose()? {
-        // writer.write_batches(&[&batch])?;
         writer.write(&batch)?;
     }
     writer.finish()?;
@@ -226,7 +272,7 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
     Ok(res)
 }
 
-// create json like string column, df should have primary_key with int type
+// create json like string column, df must have primary_key with int type
 pub async fn df_cols_to_json2(ctx: SessionContext, df: DataFrame, cols: &[&str], pk: &str, new_col: Option<&str>, drop_pk: Option<bool>) -> Result<DataFrame> {
     let mut cols_new = cols.iter().map(|x| x.to_owned()).collect::<Vec<_>>();
     cols_new.push(pk);
@@ -236,7 +282,6 @@ pub async fn df_cols_to_json2(ctx: SessionContext, df: DataFrame, cols: &[&str],
     let buf = Vec::new();
     let mut writer = arrow_json::ArrayWriter::new(buf);
     while let Some(batch) = stream.next().await.transpose()? {
-        // writer.write_batches(&[&batch])?;
         writer.write(&batch)?;
     }
     writer.finish()?;
@@ -532,6 +577,56 @@ pub async fn write_batches_to_s3(client: Client, bucket: &str, key: &str, batche
     Ok(())
 }
 
+// pub async fn df_cols_to_json_dev(ctx: SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
+//     let schema = df.schema().clone();
+//     let batches = df.collect().await?;
+//     let batches = batches.iter().map(|x| x).collect::<Vec<_>>();
+//     let field_num = schema.fields().len();
+//     let mut arrays = Vec::with_capacity(field_num);
+//     for i in 0..field_num {
+//         let array = batches
+//             .iter()
+//             .map(|batch| batch.column(i).as_ref())
+//             .collect::<Vec<_>>();
+//         let array = concat(&array)?;
+//         arrays.push(array);
+//     }
+
+//     let mut json_rows = vec![];
+//     for i in 0..field_num {
+//         let buf = Vec::new();
+//         let mut writer = arrow_json::ArrayWriter::new(buf);
+//         let arr = &arrays[i];
+//         let field = schema.as_arrow().field(i).clone();
+//         let schema = Schema::new(vec![field]);
+//         let batch = RecordBatch::try_new(schema.into(), vec![arr.clone()])?;
+//         writer.write(&batch)?;
+//         writer.finish()?;
+//         let json_data = writer.into_inner();
+//         let json_row: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice())?;
+//         json_rows.push(json_row);
+//     }
+//     // println!("{:?}", json_rows);
+//     // for json_row in &json_rows {
+//     //     println!("{:?}", json_row);
+//     //     println!();
+//     // }
+
+//     let mut str_rows = vec![];
+//     for json_row in &json_rows {
+//         let str_row = serde_json::to_string(&json_row)?;
+//         str_rows.push(str_row);
+//     }
+//     for str_row in str_rows {
+//         println!("{}", str_row);
+//         println!();
+//     }
+
+//     let res = ctx.read_empty()?;
+
+//     Ok(res)
+// }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -638,6 +733,67 @@ mod tests {
             &row3.collect().await.unwrap()
         );
     }
+
+    #[tokio::test]
+    async fn test_cols_to_json_adv() {
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("name", DataType::Utf8, true),
+            Field::new("data", DataType::Int32, true),
+        ]);
+        let batch = RecordBatch::try_new(
+            schema.clone().into(),
+            vec![
+                Arc::new(Int32Array::from(vec![1, 2, 3])),
+                Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+                Arc::new(Int32Array::from(vec![42, 43, 44])),
+            ],
+        ).unwrap();
+    
+        let ctx = SessionContext::new();
+        let df = ctx.read_batch(batch.clone()).unwrap();
+        let res = df_cols_to_json_adv(ctx, df, &["name", "data"], Some("metadata")).await.unwrap();
+
+        assert_eq!(res.schema().fields().len(), 2); // columns count
+        assert_eq!(res.clone().count().await.unwrap(), 3); // rows count
+
+        let row1 = res.clone().filter(col("id").eq(lit(1))).unwrap();
+        assert_batches_eq!(
+            &[
+                  "+----+--------------------------+",
+                  "| id | metadata                 |",
+                  "+----+--------------------------+",
+                r#"| 1  | {"data":42,"name":"foo"} |"#,
+                  "+----+--------------------------+",
+            ],
+            &row1.collect().await.unwrap()
+        );
+
+        let row2 = res.clone().filter(col("id").eq(lit(2))).unwrap();
+        assert_batches_eq!(
+            &[
+                  "+----+--------------------------+",
+                  "| id | metadata                 |",
+                  "+----+--------------------------+",
+                r#"| 2  | {"data":43,"name":"bar"} |"#,
+                  "+----+--------------------------+",
+            ],
+            &row2.collect().await.unwrap()
+        );
+
+        let row3 = res.clone().filter(col("id").eq(lit(3))).unwrap();
+        assert_batches_eq!(
+            &[
+                  "+----+--------------------------+",
+                  "| id | metadata                 |",
+                  "+----+--------------------------+",
+                r#"| 3  | {"data":44,"name":"baz"} |"#,
+                  "+----+--------------------------+",
+            ],
+            &row3.collect().await.unwrap()
+        );
+    }
+
 
     #[tokio::test]
     async fn test_cols_to_json2() {

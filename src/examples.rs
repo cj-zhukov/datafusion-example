@@ -427,7 +427,7 @@ pub async fn add_col_to_df_simple() -> Result<()> {
 }
 
 // add col of vec<&str> to existing df
-pub async fn add_col_to_df_example() -> Result<()> {
+pub async fn add_str_col_to_df_example() -> Result<()> {
     let ctx = SessionContext::new();
 
     let schema = Schema::new(vec![
