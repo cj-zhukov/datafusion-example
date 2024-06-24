@@ -14,8 +14,8 @@ use awscreds::Credentials;
 use aws_config::{BehaviorVersion, Region};
 use aws_sdk_s3::Client;
 use datafusion::arrow::compute::concat;
-use datafusion::arrow::array::{ArrayRef, Int32Array, StringArray};
-use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use datafusion::arrow::array::{ArrayRef, Int32Array, StringArray, StructArray};
+use datafusion::arrow::datatypes::{DataType, Field, Fields, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::prelude::*;
@@ -58,7 +58,7 @@ pub async fn add_pk_to_df(ctx: SessionContext, df: DataFrame, col_name: &str) ->
 }
 
 // select all columns except cols_to_exclude
-pub async fn select_all_exclude(df: DataFrame, cols_to_exclude: &[&str]) -> Result<DataFrame> {
+pub fn select_all_exclude(df: DataFrame, cols_to_exclude: &[&str]) -> Result<DataFrame> {
     let columns = df
         .schema()
         .fields()
@@ -129,12 +129,12 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
     let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
     let res = ctx.read_batch(batch)?;
 
-    let res = select_all_exclude(res, cols).await?;
+    let res = select_all_exclude(res, cols)?;
 
     Ok(res)
 }
 
-// create json like string column using joining
+// create json like string column using joining 
 pub async fn df_cols_to_json2(ctx: SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
     let pk = "pk";
     let df = add_pk_to_df(ctx.clone(), df, pk).await?;
@@ -199,6 +199,44 @@ pub async fn df_cols_to_json2(ctx: SessionContext, df: DataFrame, cols: &[&str],
         .collect::<Vec<_>>();
 
     let res = res.clone().select_columns(&columns)?;
+
+    Ok(res)
+}
+
+// convert df columns to nested struct
+pub async fn df_cols_to_struct(ctx: SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
+    let schema = df.schema().clone();
+    let batches = df.collect().await?;
+    let batches = batches.iter().map(|x| x).collect::<Vec<_>>();
+    let field_num = schema.fields().len();
+    let mut arrays = Vec::with_capacity(field_num);
+    for i in 0..field_num {
+        let array = batches
+            .iter()
+            .map(|batch| batch.column(i).as_ref())
+            .collect::<Vec<_>>();
+        let array = concat(&array)?;
+        arrays.push(array);
+    }
+
+    let batch = RecordBatch::try_new(schema.as_arrow().clone().into(), arrays.clone())?;
+    let mut struct_array_data = vec![];
+    for col in cols {
+        let field = schema.as_arrow().field_with_name(col)?.clone();
+        let arr = batch.column_by_name(col).unwrap().clone();
+        struct_array_data.push((Arc::new(field), arr));
+    }
+    let df_struct = ctx.read_batch(batch.clone())?.select_columns(cols)?;
+    let fields = df_struct.schema().clone().as_arrow().fields().clone();
+    let struct_array = StructArray::from(struct_array_data);
+    let struct_array_schema = Schema::new(vec![Field::new(new_col.unwrap_or("metadata"), DataType::Struct(Fields::from(fields)), true)]);
+    let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), struct_array_schema.clone()])?;
+    arrays.push(Arc::new(struct_array));
+    let batch_with_struct = RecordBatch::try_new(schema_new.into(), arrays)?;
+
+    let res = ctx.read_batch(batch_with_struct)?;
+
+    let res = select_all_exclude(res, cols)?;
 
     Ok(res)
 }
@@ -600,6 +638,66 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_cols_to_struct() {
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("name", DataType::Utf8, true),
+            Field::new("data", DataType::Int32, true),
+        ]);
+        let batch = RecordBatch::try_new(
+            schema.clone().into(),
+            vec![
+                Arc::new(Int32Array::from(vec![1, 2, 3])),
+                Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+                Arc::new(Int32Array::from(vec![42, 43, 44])),
+            ],
+        ).unwrap();
+    
+        let ctx = SessionContext::new();
+        let df = ctx.read_batch(batch.clone()).unwrap();
+        let res = df_cols_to_struct(ctx, df, &["name", "data"], Some("metadata")).await.unwrap();
+
+        assert_eq!(res.schema().fields().len(), 2); // columns count
+        assert_eq!(res.clone().count().await.unwrap(), 3); // rows count
+
+        let row1 = res.clone().filter(col("id").eq(lit(1))).unwrap();
+        assert_batches_eq!(
+            &[
+                  "+----+-----------------------+",
+                  "| id | metadata              |",
+                  "+----+-----------------------+",
+                r#"| 1  | {name: foo, data: 42} |"#,
+                  "+----+-----------------------+",
+            ],
+            &row1.collect().await.unwrap()
+        );
+
+        let row2 = res.clone().filter(col("id").eq(lit(2))).unwrap();
+        assert_batches_eq!(
+            &[
+                  "+----+-----------------------+",
+                  "| id | metadata              |",
+                  "+----+-----------------------+",
+                r#"| 2  | {name: bar, data: 43} |"#,
+                  "+----+-----------------------+",
+            ],
+            &row2.collect().await.unwrap()
+        );
+
+        let row3 = res.clone().filter(col("id").eq(lit(3))).unwrap();
+        assert_batches_eq!(
+            &[
+                  "+----+-----------------------+",
+                  "| id | metadata              |",
+                  "+----+-----------------------+",
+                r#"| 3  | {name: baz, data: 44} |"#,
+                  "+----+-----------------------+",
+            ],
+            &row3.collect().await.unwrap()
+        );
+    }
+
+    #[tokio::test]
     async fn test_select_all_exclude() {
         let schema = Schema::new(vec![
             Field::new("id", DataType::Int32, false),
@@ -619,7 +717,7 @@ mod tests {
     
         let ctx = SessionContext::new();
         let df = ctx.read_batch(batch.clone()).unwrap();
-        let res = select_all_exclude(df, &["pkey", "data"]).await.unwrap();
+        let res = select_all_exclude(df, &["pkey", "data"]).unwrap();
         
         assert_eq!(res.schema().fields().len(), 2); // columns count
         assert_eq!(res.clone().count().await.unwrap(), 3); // rows count
