@@ -26,7 +26,7 @@ use itertools::Itertools;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio_stream::StreamExt;
-use futures_util::TryStreamExt;
+use futures_util::{TryFutureExt, TryStreamExt};
 use url::Url;
 
 // add auto-increment column to df
@@ -81,8 +81,8 @@ pub fn get_column_names(df: DataFrame) -> Vec<String> {
         .collect::<Vec<_>>()
 }
 
-// create json like string column
-pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
+// concat arrays per column
+pub async fn concat_arrays(df: DataFrame) -> Result<Vec<ArrayRef>> {
     let schema = df.schema().clone();
     let batches = df.collect().await?;
     let batches = batches.iter().map(|x| x).collect::<Vec<_>>();
@@ -94,8 +94,17 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
             .map(|batch| batch.column(i).as_ref())
             .collect::<Vec<_>>();
         let array = concat(&array)?;
+        
         arrays.push(array);
     }
+
+    Ok(arrays)
+}
+
+// create json like string column
+pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
+    let schema = df.schema().clone();
+    let mut arrays = concat_arrays(df).await?;
 
     let batch = RecordBatch::try_new(schema.as_arrow().clone().into(), arrays.clone())?;
     let df_prepared = ctx.read_batch(batch)?;
@@ -206,18 +215,7 @@ pub async fn df_cols_to_json2(ctx: SessionContext, df: DataFrame, cols: &[&str],
 // convert df columns to nested struct
 pub async fn df_cols_to_struct(ctx: SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
     let schema = df.schema().clone();
-    let batches = df.collect().await?;
-    let batches = batches.iter().map(|x| x).collect::<Vec<_>>();
-    let field_num = schema.fields().len();
-    let mut arrays = Vec::with_capacity(field_num);
-    for i in 0..field_num {
-        let array = batches
-            .iter()
-            .map(|batch| batch.column(i).as_ref())
-            .collect::<Vec<_>>();
-        let array = concat(&array)?;
-        arrays.push(array);
-    }
+    let mut arrays = concat_arrays(df).await?;
 
     let batch = RecordBatch::try_new(schema.as_arrow().clone().into(), arrays.clone())?;
     let mut struct_array_data = vec![];
@@ -473,7 +471,7 @@ pub async fn write_batches_to_s3(client: Client, bucket: &str, key: &str, batche
 #[cfg(test)]
 mod tests {
     use super::*;
-    use datafusion::assert_batches_eq;
+    use datafusion::{arrow::array::Array, assert_batches_eq};
 
     #[test]
     fn test_get_column_names() {
@@ -515,6 +513,39 @@ mod tests {
             serde_json::Value::Object(json_rows[1].clone()),
             serde_json::json!({"a": 2}),
         );
+    }
+
+    #[tokio::test]
+    async fn test_concat_arrays() {
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("name", DataType::Utf8, true),
+            Field::new("data", DataType::Int32, true),
+        ]);
+        let batch = RecordBatch::try_new(
+            schema.clone().into(),
+            vec![
+                Arc::new(Int32Array::from(vec![1, 2, 3])),
+                Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+                Arc::new(Int32Array::from(vec![42, 43, 44])),
+            ],
+        ).unwrap();
+    
+        let ctx = SessionContext::new();
+        let df = ctx.read_batch(batch.clone()).unwrap();
+        let arrays = concat_arrays(df).await.unwrap();
+        assert_eq!(arrays.len(), 3);
+
+        let ids = arrays.get(0).unwrap().as_any().downcast_ref::<Int32Array>().unwrap();
+        assert_eq!(ids.values(), &[1, 2, 3]);
+
+        let names = arrays.get(1).unwrap().as_any().downcast_ref::<StringArray>().unwrap();
+        assert_eq!(names.value(0), "foo");
+        assert_eq!(names.value(1), "bar");
+        assert_eq!(names.value(2), "baz");
+
+        let data_all = arrays.get(2).unwrap().as_any().downcast_ref::<Int32Array>().unwrap();
+        assert_eq!(data_all.values(), &[42, 43, 44]);
     }
 
     #[tokio::test]
