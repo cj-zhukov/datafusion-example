@@ -26,7 +26,7 @@ use itertools::Itertools;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio_stream::StreamExt;
-use futures_util::{TryFutureExt, TryStreamExt};
+use futures_util::TryStreamExt;
 use url::Url;
 
 // add auto-increment column to df

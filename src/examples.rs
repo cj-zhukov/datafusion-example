@@ -102,6 +102,28 @@ pub async fn get_df3() -> Result<DataFrame> {
     Ok(df)
 }
 
+pub async fn create_df_with_serial_col() -> Result<DataFrame> {
+    let ctx = SessionContext::new();
+    let schema = Schema::new(vec![
+        Field::new("id", DataType::Int32, false),
+        Field::new("pkey", DataType::Int32, false),
+        Field::new("name", DataType::Utf8, true),
+        Field::new("data", DataType::Int32, true),
+    ]);
+    let batch = RecordBatch::try_new(
+        schema.clone().into(),
+        vec![
+            Arc::new(Int32Array::from_iter(0..3_i32)),
+            Arc::new(Int32Array::from(vec![1, 2, 3])),
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+            Arc::new(Int32Array::from(vec![42, 43, 44])),
+        ],
+    )?;
+    let df = ctx.read_batch(batch.clone())?;
+
+    Ok(df)
+}
+
 pub async fn assert_example() -> Result<()> {
     let ctx = SessionContext::new();
 

@@ -10,7 +10,7 @@ use datafusion::prelude::*;
 async fn main() -> Result<()> {
     let now = Instant::now();
 
-    let ctx = SessionContext::new();  
+    // let ctx = SessionContext::new(); 
     // let df = ctx.read_parquet("data/foo.parquet", ParquetReadOptions::default()).await?;
     // let df1 = get_df().await?;
     // let df2 = get_df2().await?.with_column_renamed("id", "id2")?;
