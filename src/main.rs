@@ -10,14 +10,15 @@ use datafusion::prelude::*;
 async fn main() -> Result<()> {
     let now = Instant::now();
 
-    // let ctx = SessionContext::new(); 
+    let ctx = SessionContext::new(); 
     // let df = ctx.read_parquet("data/foo.parquet", ParquetReadOptions::default()).await?;
-    // let df1 = get_df().await?;
-    // let df2 = get_df2().await?.with_column_renamed("id", "id2")?;
+    let df1 = get_df().await?;
+    let df2 = get_df2().await?.with_column_renamed("id", "id2")?;
 
-    // let df = df1
-    //     .join(df2, JoinType::Inner, &["id"], &["id2"], None)?
-    //     .select_columns(&["id", "name", "data"])?;
+    let res = df1
+        .join(df2, JoinType::Inner, &["id"], &["id2"], None)?
+        .select_columns(&["id", "name", "data"])?;
+    res.show().await?;
 
     // let res = df_cols_to_json(ctx.clone(), df, &["name", "data"], Some("new_col")).await?;
     // let res = df_cols_to_struct(ctx, df, &["name", "data"], Some("new_col")).await?;

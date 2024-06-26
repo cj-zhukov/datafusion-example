@@ -1,3 +1,5 @@
+use crate::df_cols_to_json;
+
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -5,7 +7,7 @@ use anyhow::Result;
 use datafusion::arrow::compute::concat;
 use datafusion::arrow::array::{ArrayRef, BooleanArray, Int32Array, ListArray, RecordBatch, StringArray, StructArray};
 use datafusion::scalar::ScalarValue;
-use datafusion::{arrow, prelude::*};
+use datafusion::{arrow, assert_batches_eq, prelude::*};
 use datafusion::arrow::datatypes::{DataType, Field, Fields, Int32Type, Schema};
 use itertools::Itertools;
 use serde_json::{Map, Value};
@@ -124,7 +126,7 @@ pub async fn create_df_with_serial_col() -> Result<DataFrame> {
     Ok(df)
 }
 
-pub async fn assert_example() -> Result<()> {
+pub async fn assert_example_simple() -> Result<()> {
     let ctx = SessionContext::new();
 
     let schema = Schema::new(vec![
@@ -159,6 +161,81 @@ pub async fn assert_example() -> Result<()> {
     assert_eq!(pretty_results.trim().lines().collect::<Vec<_>>(), expected);
 
     Ok(())
+}
+
+pub async fn assert_example() {
+    let schema = Schema::new(vec![
+        Field::new("id", DataType::Int32, false),
+        Field::new("name", DataType::Utf8, true),
+        Field::new("data", DataType::Int32, true),
+    ]);
+    let batch = RecordBatch::try_new(
+        schema.clone().into(),
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])),
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+            Arc::new(Int32Array::from(vec![42, 43, 44])),
+        ],
+    ).unwrap();
+
+    let ctx = SessionContext::new();
+    let df = ctx.read_batch(batch.clone()).unwrap();
+    let res = df_cols_to_json(ctx, df, &["name", "data"], Some("metadata")).await.unwrap();
+
+    assert_eq!(res.schema().fields().len(), 2); // columns count
+    assert_eq!(res.clone().count().await.unwrap(), 3); // rows count
+
+    // check all df
+    let rows = res.clone().sort(vec![col("id").sort(true, true)]).unwrap();
+    assert_batches_eq!(
+        &[
+              "+----+--------------------------+",
+              "| id | metadata                 |",
+              "+----+--------------------------+",
+            r#"| 1  | {"data":42,"name":"foo"} |"#,
+            r#"| 2  | {"data":43,"name":"bar"} |"#,
+            r#"| 3  | {"data":44,"name":"baz"} |"#,
+              "+----+--------------------------+",
+        ],
+        &rows.collect().await.unwrap()
+    );
+
+    // check each row
+    let row1 = res.clone().filter(col("id").eq(lit(1))).unwrap();
+    assert_batches_eq!(
+        &[
+              "+----+--------------------------+",
+              "| id | metadata                 |",
+              "+----+--------------------------+",
+            r#"| 1  | {"data":42,"name":"foo"} |"#,
+              "+----+--------------------------+",
+        ],
+        &row1.collect().await.unwrap()
+    );
+
+    let row2 = res.clone().filter(col("id").eq(lit(2))).unwrap();
+    assert_batches_eq!(
+        &[
+              "+----+--------------------------+",
+              "| id | metadata                 |",
+              "+----+--------------------------+",
+            r#"| 2  | {"data":43,"name":"bar"} |"#,
+              "+----+--------------------------+",
+        ],
+        &row2.collect().await.unwrap()
+    );
+
+    let row3 = res.clone().filter(col("id").eq(lit(3))).unwrap();
+    assert_batches_eq!(
+        &[
+              "+----+--------------------------+",
+              "| id | metadata                 |",
+              "+----+--------------------------+",
+            r#"| 3  | {"data":44,"name":"baz"} |"#,
+              "+----+--------------------------+",
+        ],
+        &row3.collect().await.unwrap()
+    );
 }
 
 pub async fn join_dfs_example() -> Result<()> {
