@@ -367,7 +367,7 @@ pub async fn demo_struct() -> Result<()> {
     let mut data_all = vec![];
     for batch in &batches {
         let xs = batch.columns();
-        let id = xs.get(0).unwrap().as_any().downcast_ref::<Int32Array>().unwrap().iter().collect::<Vec<_>>();
+        let id = xs.first().unwrap().as_any().downcast_ref::<Int32Array>().unwrap().iter().collect::<Vec<_>>();
         let name = xs.get(1).unwrap().as_any().downcast_ref::<StringArray>().unwrap().iter().collect::<Vec<_>>();
         let data = xs.get(2).unwrap().as_any().downcast_ref::<Int32Array>().unwrap().iter().collect::<Vec<_>>();
         ids.extend(id);
@@ -568,7 +568,7 @@ pub async fn add_str_col_to_df_example() -> Result<()> {
 
     let schema = df.schema().clone();
     let batches = df.collect().await?;
-    let batches = batches.iter().map(|x| x).collect::<Vec<_>>();
+    let batches = batches.iter().collect::<Vec<_>>();
     let field_num = schema.fields().len();
     let mut arrays = Vec::with_capacity(field_num);
     for i in 0..field_num {
@@ -734,7 +734,7 @@ pub async fn df_cols_to_struct_example() -> Result<()> {
     let mut data_all = vec![];
     for batch in &batches {
         let xs = batch.columns();
-        let pk = xs.get(0).unwrap().as_any().downcast_ref::<Int32Array>().unwrap().iter().collect::<Vec<_>>();
+        let pk = xs.first().unwrap().as_any().downcast_ref::<Int32Array>().unwrap().iter().collect::<Vec<_>>();
         let name = xs.get(1).unwrap().as_any().downcast_ref::<StringArray>().unwrap().iter().collect::<Vec<_>>();
         let data = xs.get(2).unwrap().as_any().downcast_ref::<Int32Array>().unwrap().iter().collect::<Vec<_>>();
         pkeys.extend(pk);

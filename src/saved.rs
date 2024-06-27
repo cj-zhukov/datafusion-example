@@ -35,7 +35,7 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
         primary_keys.push(*i);
         let row = res[i].clone();
         // add Option type for json string like col
-        let str_row = if row.len() > 0 {
+        let str_row = if !row.is_empty() {
             let str_row = serde_json::to_string(&row)?;
             Some(str_row)
         } else {
@@ -75,7 +75,7 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
         .iter()
         .map(|x| x.name().as_str())
         .filter(|x| !x.contains("tojoin"))
-        .filter(|x| cols_new.iter().find(|col| col.contains(x)).is_none())
+        .filter(|x| !cols_new.iter().any(|col| col.contains(x)))
         .collect::<Vec<_>>();
     // println!("{:?}", columns);
 
@@ -113,7 +113,7 @@ pub async fn df_cols_to_json2(ctx: SessionContext, df: DataFrame, cols: &[&str],
         primary_keys.push(*i);
         let row = res[i].clone();
         // add Option type for json string like col
-        let str_row = if row.len() > 0 {
+        let str_row = if !row.is_empty() {
             let str_row = serde_json::to_string(&row)?;
             Some(str_row)
         } else {
@@ -145,7 +145,7 @@ pub async fn df_cols_to_json2(ctx: SessionContext, df: DataFrame, cols: &[&str],
         .iter()
         .map(|x| x.name().as_str())
         .filter(|x| !x.contains("tojoin"))
-        .filter(|x| cols_new.iter().find(|col| col.eq(&x)).is_none())
+        .filter(|x| !cols_new.iter().any(|col| col.eq(x)))
         .collect::<Vec<_>>();
 
     let res = res.clone().select_columns(&columns)?;
