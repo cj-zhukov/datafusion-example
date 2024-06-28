@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
 use anyhow::{Result, Context};
+use aws_config::{BehaviorVersion, Region};
+use aws_sdk_s3::Client;
 use awscreds::Credentials;
 use aws_sdk_s3::operation::create_multipart_upload::CreateMultipartUploadOutput;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
-use aws_sdk_s3::Client;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::datatypes::Schema;
 use datafusion::dataframe::DataFrameWriteOptions;
@@ -14,6 +15,22 @@ use object_store::aws::AmazonS3Builder;
 use parquet::arrow::AsyncArrowWriter;
 use tokio_stream::StreamExt;
 use url::Url;
+
+pub async fn get_aws_client(region: &str) -> Result<Client> {
+    let config = aws_config::defaults(BehaviorVersion::v2023_11_09())
+        .region(Region::new(region.to_string()))
+        .load()
+        .await;
+
+    let client = Client::from_conf(
+        aws_sdk_s3::config::Builder::from(&config)
+            .retry_config(aws_config::retry::RetryConfig::standard()
+            .with_max_attempts(10))
+            .build()
+    );
+
+    Ok(client)
+}
 
 pub async fn read_from_s3(ctx: SessionContext, bucket: &str, region: &str, key: &str) -> Result<()> {
     let creds = Credentials::default()?;

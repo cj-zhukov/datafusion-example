@@ -6,9 +6,7 @@ pub mod saved;
 use std::io::{Cursor, Write};
 use std::sync::Arc;
 
-use anyhow::{Result, Context};
-use aws_config::{BehaviorVersion, Region};
-use aws_sdk_s3::Client;
+use anyhow::Result;
 use datafusion::arrow::compute::concat;
 use datafusion::arrow::array::{ArrayRef, Int32Array, StringArray, StructArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
@@ -113,7 +111,6 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
 
     let mut str_rows = vec![];
     for json_row in &json_rows {
-        // let str_row = serde_json::to_string(&json_row)?;
         let str_row = if !json_rows.is_empty() {
             let str_row = serde_json::to_string(&json_row)?;
             Some(str_row)
@@ -163,22 +160,6 @@ pub async fn df_cols_to_struct(ctx: SessionContext, df: DataFrame, cols: &[&str]
     Ok(res)
 }
 
-pub async fn get_aws_client(region: &str) -> Result<Client> {
-    let config = aws_config::defaults(BehaviorVersion::v2023_11_09())
-        .region(Region::new(region.to_string()))
-        .load()
-        .await;
-
-    let client = Client::from_conf(
-        aws_sdk_s3::config::Builder::from(&config)
-            .retry_config(aws_config::retry::RetryConfig::standard()
-            .with_max_attempts(10))
-            .build()
-    );
-
-    Ok(client)
-}
-
 pub async fn read_file_to_df(ctx: SessionContext, file_path: &str) -> Result<DataFrame> {
     let mut buf = vec![];
     let _n = File::open(file_path).await?.read_to_end(&mut buf).await?;
@@ -194,14 +175,12 @@ pub async fn read_file_to_df(ctx: SessionContext, file_path: &str) -> Result<Dat
 pub async fn write_to_file(df: DataFrame, file_path: &str) -> Result<()> {
     let mut buf = vec![];
     let schema = Schema::from(df.clone().schema());
-    let mut stream = df.execute_stream().await.context("could not create stream from df")?;
-    let mut writer = AsyncArrowWriter::try_new(&mut buf, schema.into(), None).context("could not create writer")?;
-    while let Some(batch) = stream.next().await {
-        let batch = batch.context("could not get record batch")?;
-        writer.write(&batch).await.context("could not write to writer")?;
+    let mut stream = df.execute_stream().await?;
+    let mut writer = AsyncArrowWriter::try_new(&mut buf, schema.into(), None)?;
+    while let Some(batch) = stream.next().await.transpose()? {
+        writer.write(&batch).await?;
     }
-    writer.close().await.context("could not close writer")?;
-
+    writer.close().await?;
     let mut file = std::fs::File::create(file_path)?;
     file.write_all(&buf)?;
 
