@@ -25,7 +25,7 @@ async fn main() -> Result<()> {
     // res.show().await?;
 
 
-    // write_to_file(res, "data/foo_df.parquet").await?;
+    // write_df_to_file(res, "data/foo_df.parquet").await?;
 
     println!("end processing elapsed: {:.2?}", now.elapsed());
 

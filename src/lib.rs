@@ -19,7 +19,7 @@ use tokio::io::AsyncReadExt;
 use tokio_stream::StreamExt;
 use futures_util::TryStreamExt;
 
-// add auto-increment column to df
+/// Add auto-increment column to df
 pub async fn add_pk_to_df(ctx: SessionContext, df: DataFrame, col_name: &str) -> Result<DataFrame> {
     let schema = df.schema().clone();
     let batches = df.collect().await?;
@@ -47,14 +47,14 @@ pub async fn add_pk_to_df(ctx: SessionContext, df: DataFrame, col_name: &str) ->
     Ok(res)
 }
 
-// select all columns except cols_to_exclude
-pub fn select_all_exclude(df: DataFrame, cols_to_exclude: &[&str]) -> Result<DataFrame> {
+/// Select all columns except to_exclude
+pub fn select_all_exclude(df: DataFrame, to_exclude: &[&str]) -> Result<DataFrame> {
     let columns = df
         .schema()
         .fields()
         .iter()
         .map(|x| x.name().as_str())
-        .filter(|x| !cols_to_exclude.iter().any(|col| col.eq(x)))
+        .filter(|x| !to_exclude.iter().any(|col| col.eq(x)))
         .collect::<Vec<_>>();
     
     let res = df.clone().select_columns(&columns)?;
@@ -62,7 +62,7 @@ pub fn select_all_exclude(df: DataFrame, cols_to_exclude: &[&str]) -> Result<Dat
     Ok(res)
 }
 
-// get df columns names
+/// Get df columns names
 pub fn get_column_names(df: DataFrame) -> Vec<String> {
     df
         .schema()
@@ -72,7 +72,7 @@ pub fn get_column_names(df: DataFrame) -> Vec<String> {
         .collect::<Vec<_>>()
 }
 
-// concat arrays per column
+/// Concat arrays per column
 pub async fn concat_arrays(df: DataFrame) -> Result<Vec<ArrayRef>> {
     let schema = df.schema().clone();
     let batches = df.collect().await?;
@@ -92,7 +92,7 @@ pub async fn concat_arrays(df: DataFrame) -> Result<Vec<ArrayRef>> {
     Ok(arrays)
 }
 
-// create json like string column
+/// Create json like string column new_col from cols
 pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
     let schema = df.schema().clone();
     let mut arrays = concat_arrays(df).await?;
@@ -123,7 +123,7 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
     let new_col_arr: ArrayRef = Arc::new(StringArray::from(str_rows));
     arrays.push(new_col_arr);
 
-    let schema_new_col = Schema::new(vec![Field::new(new_col.unwrap_or("metadata"), DataType::Utf8, true)]);
+    let schema_new_col = Schema::new(vec![Field::new(new_col.unwrap_or("new_col"), DataType::Utf8, true)]);
     let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_new_col])?;
     let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
     let res = ctx.read_batch(batch)?;
@@ -133,7 +133,7 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
     Ok(res)
 }
 
-// convert df columns to nested struct
+/// Create nested struct column new_cols from cols
 pub async fn df_cols_to_struct(ctx: SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
     let schema = df.schema().clone();
     let mut arrays = concat_arrays(df).await?;
@@ -148,7 +148,7 @@ pub async fn df_cols_to_struct(ctx: SessionContext, df: DataFrame, cols: &[&str]
     let df_struct = ctx.read_batch(batch.clone())?.select_columns(cols)?;
     let fields = df_struct.schema().clone().as_arrow().fields().clone();
     let struct_array = StructArray::from(struct_array_data);
-    let struct_array_schema = Schema::new(vec![Field::new(new_col.unwrap_or("metadata"), DataType::Struct(fields), true)]);
+    let struct_array_schema = Schema::new(vec![Field::new(new_col.unwrap_or("new_col"), DataType::Struct(fields), true)]);
     let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), struct_array_schema.clone()])?;
     arrays.push(Arc::new(struct_array));
     let batch_with_struct = RecordBatch::try_new(schema_new.into(), arrays)?;
@@ -160,6 +160,7 @@ pub async fn df_cols_to_struct(ctx: SessionContext, df: DataFrame, cols: &[&str]
     Ok(res)
 }
 
+/// Read parquet file to df
 pub async fn read_file_to_df(ctx: SessionContext, file_path: &str) -> Result<DataFrame> {
     let mut buf = vec![];
     let _n = File::open(file_path).await?.read_to_end(&mut buf).await?;
@@ -172,7 +173,8 @@ pub async fn read_file_to_df(ctx: SessionContext, file_path: &str) -> Result<Dat
     Ok(df)
 }
 
-pub async fn write_to_file(df: DataFrame, file_path: &str) -> Result<()> {
+/// Write df to parquet file
+pub async fn write_df_to_file(df: DataFrame, file_path: &str) -> Result<()> {
     let mut buf = vec![];
     let schema = Schema::from(df.clone().schema());
     let mut stream = df.execute_stream().await?;
