@@ -92,6 +92,18 @@ pub async fn concat_arrays(df: DataFrame) -> Result<Vec<ArrayRef>> {
     Ok(arrays)
 }
 
+/// Concat dataframes with the same schema into one dataframe
+pub async fn concat_dfs(ctx: SessionContext, dfs: Vec<DataFrame>) -> Result<DataFrame> {
+    let mut batches = vec![];
+    for df in dfs {
+        let batch = df.collect().await?;
+        batches.extend(batch);
+    }
+    let res = ctx.read_batches(batches)?;
+
+    Ok(res)
+}
+
 /// Create json like string column new_col from cols
 pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
     let schema = df.schema().clone();
@@ -423,4 +435,49 @@ mod tests {
             &rows.collect().await.unwrap()
         );
     }
+
+    #[tokio::test]
+    async fn test_concat_dfs() {
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("name", DataType::Utf8, true),
+            Field::new("data", DataType::Int32, true),
+        ]);
+        let batch = RecordBatch::try_new(
+            schema.clone().into(),
+            vec![
+                Arc::new(Int32Array::from(vec![1, 2, 3])),
+                Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+                Arc::new(Int32Array::from(vec![42, 43, 44])),
+            ],
+        ).unwrap();
+    
+        let ctx = SessionContext::new();
+        let df1 = ctx.read_batch(batch.clone()).unwrap();
+        let df2 = df1.clone();
+
+        let res = concat_dfs(ctx, vec![df1, df2]).await.unwrap();
+
+        assert_eq!(res.schema().fields().len(), 3); // columns count
+        assert_eq!(res.clone().count().await.unwrap(), 6); // rows count
+        
+        let rows = res.sort(vec![col("id").sort(true, true)]).unwrap();
+        assert_batches_eq!(
+            &[
+                "+----+------+------+",
+                "| id | name | data |",
+                "+----+------+------+",
+                "| 1  | foo  | 42   |",
+                "| 1  | foo  | 42   |",
+                "| 2  | bar  | 43   |",
+                "| 2  | bar  | 43   |",
+                "| 3  | baz  | 44   |",
+                "| 3  | baz  | 44   |",
+                "+----+------+------+",
+            ],
+            &rows.collect().await.unwrap()
+        );
+    }
+
+
 }
