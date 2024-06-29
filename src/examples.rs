@@ -46,7 +46,7 @@ pub async fn simple() -> Result<()> {
     Ok(())
 }
 
-pub async fn get_df() -> Result<DataFrame> {
+pub fn get_df() -> Result<DataFrame> {
     let ctx = SessionContext::new();
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
@@ -64,7 +64,7 @@ pub async fn get_df() -> Result<DataFrame> {
     Ok(df)
 }
 
-pub async fn get_df2() -> Result<DataFrame> {
+pub fn get_df2() -> Result<DataFrame> {
     let ctx = SessionContext::new();
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
@@ -82,7 +82,7 @@ pub async fn get_df2() -> Result<DataFrame> {
     Ok(df)
 }
 
-pub async fn get_df3() -> Result<DataFrame> {
+pub fn get_df3() -> Result<DataFrame> {
     let ctx = SessionContext::new();
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
@@ -104,7 +104,36 @@ pub async fn get_df3() -> Result<DataFrame> {
     Ok(df)
 }
 
-pub async fn create_df_with_serial_col() -> Result<DataFrame> {
+pub fn get_df4() -> Result<DataFrame> {
+    let ctx = SessionContext::new();
+    let schema = Schema::new(vec![
+        Field::new("id", DataType::Int32, false),
+        Field::new("foo", DataType::Utf8, true),
+        Field::new("bar", DataType::Utf8, true),
+        Field::new("baz", DataType::Utf8, true),
+    ]);
+    
+    let id: Int32Array = Int32Array::from_iter(0..1_000_000 as i32);
+    let foo: StringArray = std::iter::repeat(Some("foo")).take(1_000_000).collect();
+    let bar: StringArray = std::iter::repeat(Some("bar")).take(1_000_000).collect();
+    let baz: StringArray = std::iter::repeat(Some("baz")).take(1_000_000).collect();
+
+    let batch = RecordBatch::try_new(
+        schema.clone().into(),
+        vec![
+            Arc::new(id),
+            Arc::new(foo),
+            Arc::new(bar),
+            Arc::new(baz),
+        ],
+    )?;
+
+    let df = ctx.read_batch(batch.clone())?;
+
+    Ok(df)
+}
+
+pub fn create_df_with_serial_col() -> Result<DataFrame> {
     let ctx = SessionContext::new();
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
@@ -239,8 +268,8 @@ pub async fn assert_example() {
 }
 
 pub async fn join_dfs_example() -> Result<()> {
-    let df1 = get_df().await?;
-    let df2 = get_df2().await?.with_column_renamed("id", "id_tojoin")?;
+    let df1 = get_df()?;
+    let df2 = get_df2()?.with_column_renamed("id", "id_tojoin")?;
     let df = df1.clone().join(df2.clone(), JoinType::Inner, &["id"], &["id_tojoin"], None)?;
 
     // select all columns from joined df except tojoin

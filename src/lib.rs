@@ -19,7 +19,7 @@ use tokio::io::AsyncReadExt;
 use tokio_stream::StreamExt;
 use futures_util::TryStreamExt;
 
-/// Add auto-increment column to df
+/// Add auto-increment column to dataframe
 pub async fn add_pk_to_df(ctx: SessionContext, df: DataFrame, col_name: &str) -> Result<DataFrame> {
     let schema = df.schema().clone();
     let batches = df.collect().await?;
@@ -47,6 +47,58 @@ pub async fn add_pk_to_df(ctx: SessionContext, df: DataFrame, col_name: &str) ->
     Ok(res)
 }
 
+/// Add int32 column to existing dataframe
+pub async fn add_int_col_to_df(ctx: SessionContext, df: DataFrame, data: Vec<i32>, col_name: &str) -> Result<DataFrame> {
+    let schema = df.schema().clone();
+    let batches = df.collect().await?;
+    let batches = batches.iter().collect::<Vec<_>>();
+    let field_num = schema.fields().len();
+    let mut arrays = Vec::with_capacity(field_num);
+    for i in 0..field_num {
+        let array = batches
+            .iter()
+            .map(|batch| batch.column(i).as_ref())
+            .collect::<Vec<_>>();
+        let array = concat(&array)?;
+        arrays.push(array);
+    }
+    let new_col: ArrayRef = Arc::new(Int32Array::from(data));
+    arrays.push(new_col);
+    
+    let schema_new_col = Schema::new(vec![Field::new(col_name, DataType::Int32, true)]);
+    let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_new_col])?;
+    let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
+    let res = ctx.read_batch(batch)?;
+
+    Ok(res)
+}
+
+/// Add string column to existing dataframe
+pub async fn add_str_col_to_df(ctx: SessionContext, df: DataFrame, data: Vec<&str>, col_name: &str) -> Result<DataFrame> {
+    let schema = df.schema().clone();
+    let batches = df.collect().await?;
+    let batches = batches.iter().collect::<Vec<_>>();
+    let field_num = schema.fields().len();
+    let mut arrays = Vec::with_capacity(field_num);
+    for i in 0..field_num {
+        let array = batches
+            .iter()
+            .map(|batch| batch.column(i).as_ref())
+            .collect::<Vec<_>>();
+        let array = concat(&array)?;
+        arrays.push(array);
+    }
+    let new_col: ArrayRef = Arc::new(StringArray::from(data));
+    arrays.push(new_col);
+    
+    let schema_new_col = Schema::new(vec![Field::new(col_name, DataType::Utf8, true)]);
+    let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_new_col])?;
+    let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
+    let res = ctx.read_batch(batch)?;
+
+    Ok(res)
+}
+
 /// Select all columns except to_exclude
 pub fn select_all_exclude(df: DataFrame, to_exclude: &[&str]) -> Result<DataFrame> {
     let columns = df
@@ -62,7 +114,7 @@ pub fn select_all_exclude(df: DataFrame, to_exclude: &[&str]) -> Result<DataFram
     Ok(res)
 }
 
-/// Get df columns names
+/// Get dataframe columns names
 pub fn get_column_names(df: DataFrame) -> Vec<String> {
     df
         .schema()
@@ -172,7 +224,7 @@ pub async fn df_cols_to_struct(ctx: SessionContext, df: DataFrame, cols: &[&str]
     Ok(res)
 }
 
-/// Read parquet file to df
+/// Read parquet file to dataframe
 pub async fn read_file_to_df(ctx: SessionContext, file_path: &str) -> Result<DataFrame> {
     let mut buf = vec![];
     let _n = File::open(file_path).await?.read_to_end(&mut buf).await?;
@@ -185,7 +237,7 @@ pub async fn read_file_to_df(ctx: SessionContext, file_path: &str) -> Result<Dat
     Ok(df)
 }
 
-/// Write df to parquet file
+/// Write dataframe to parquet file
 pub async fn write_df_to_file(df: DataFrame, file_path: &str) -> Result<()> {
     let mut buf = vec![];
     let schema = Schema::from(df.clone().schema());
@@ -479,5 +531,79 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn test_add_int_col_to_df() {
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("name", DataType::Utf8, true),
+        ]);
+        let batch = RecordBatch::try_new(
+            schema.clone().into(),
+            vec![
+                Arc::new(Int32Array::from(vec![1, 2, 3])),
+                Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+            ],
+        ).unwrap();
+    
+        let ctx = SessionContext::new();
+        let df = ctx.read_batch(batch.clone()).unwrap();
 
+        let data = vec![42, 43, 44];
+        let res = add_int_col_to_df(ctx, df, data, "data").await.unwrap();
+
+        assert_eq!(res.schema().fields().len(), 3); // columns count
+        assert_eq!(res.clone().count().await.unwrap(), 3); // rows count
+        
+        let rows = res.sort(vec![col("id").sort(true, true)]).unwrap();
+        assert_batches_eq!(
+            &[
+                "+----+------+------+",
+                "| id | name | data |",
+                "+----+------+------+",
+                "| 1  | foo  | 42   |",
+                "| 2  | bar  | 43   |",
+                "| 3  | baz  | 44   |",
+                "+----+------+------+",
+            ],
+            &rows.collect().await.unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_add_str_col_to_df() {
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("data", DataType::Int32, true),
+        ]);
+        let batch = RecordBatch::try_new(
+            schema.clone().into(),
+            vec![
+                Arc::new(Int32Array::from(vec![1, 2, 3])),
+                Arc::new(Int32Array::from(vec![42, 43, 44])),
+            ],
+        ).unwrap();
+    
+        let ctx = SessionContext::new();
+        let df = ctx.read_batch(batch.clone()).unwrap();
+
+        let data = vec!["foo", "bar", "baz"];
+        let res = add_str_col_to_df(ctx, df, data, "name").await.unwrap();
+
+        assert_eq!(res.schema().fields().len(), 3); // columns count
+        assert_eq!(res.clone().count().await.unwrap(), 3); // rows count
+        
+        let rows = res.sort(vec![col("id").sort(true, true)]).unwrap();
+        assert_batches_eq!(
+            &[
+                "+----+------+------+",
+                "| id | data | name |",
+                "+----+------+------+",
+                "| 1  | 42   | foo  |",
+                "| 2  | 43   | bar  |",
+                "| 3  | 44   | baz  |",
+                "+----+------+------+",
+            ],
+            &rows.collect().await.unwrap()
+        );
+    }
 }
