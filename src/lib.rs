@@ -22,23 +22,10 @@ use futures_util::TryStreamExt;
 /// Add auto-increment column to dataframe
 pub async fn add_pk_to_df(ctx: SessionContext, df: DataFrame, col_name: &str) -> Result<DataFrame> {
     let schema = df.schema().clone();
-    let batches = df.collect().await?;
-    let batches = batches.iter().collect::<Vec<_>>();
-    let field_num = schema.fields().len();
-    let mut arrays = Vec::with_capacity(field_num);
-    for i in 0..field_num {
-        let array = batches
-            .iter()
-            .map(|batch| batch.column(i).as_ref())
-            .collect::<Vec<_>>();
-        let array = concat(&array)?;
-        arrays.push(array);
-    }
-    
+    let mut arrays = concat_arrays(df).await?;    
     let max_len = arrays.first().unwrap().len();
     let pks: ArrayRef = Arc::new(Int32Array::from_iter(0..max_len as i32));
     arrays.push(pks);
-    
     let schema_pks = Schema::new(vec![Field::new(col_name, DataType::Int32, true)]);
     let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_pks])?;
     let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
@@ -50,21 +37,9 @@ pub async fn add_pk_to_df(ctx: SessionContext, df: DataFrame, col_name: &str) ->
 /// Add int32 column to existing dataframe
 pub async fn add_int_col_to_df(ctx: SessionContext, df: DataFrame, data: Vec<i32>, col_name: &str) -> Result<DataFrame> {
     let schema = df.schema().clone();
-    let batches = df.collect().await?;
-    let batches = batches.iter().collect::<Vec<_>>();
-    let field_num = schema.fields().len();
-    let mut arrays = Vec::with_capacity(field_num);
-    for i in 0..field_num {
-        let array = batches
-            .iter()
-            .map(|batch| batch.column(i).as_ref())
-            .collect::<Vec<_>>();
-        let array = concat(&array)?;
-        arrays.push(array);
-    }
+    let mut arrays = concat_arrays(df).await?;  
     let new_col: ArrayRef = Arc::new(Int32Array::from(data));
     arrays.push(new_col);
-    
     let schema_new_col = Schema::new(vec![Field::new(col_name, DataType::Int32, true)]);
     let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_new_col])?;
     let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
@@ -76,21 +51,9 @@ pub async fn add_int_col_to_df(ctx: SessionContext, df: DataFrame, data: Vec<i32
 /// Add string column to existing dataframe
 pub async fn add_str_col_to_df(ctx: SessionContext, df: DataFrame, data: Vec<&str>, col_name: &str) -> Result<DataFrame> {
     let schema = df.schema().clone();
-    let batches = df.collect().await?;
-    let batches = batches.iter().collect::<Vec<_>>();
-    let field_num = schema.fields().len();
-    let mut arrays = Vec::with_capacity(field_num);
-    for i in 0..field_num {
-        let array = batches
-            .iter()
-            .map(|batch| batch.column(i).as_ref())
-            .collect::<Vec<_>>();
-        let array = concat(&array)?;
-        arrays.push(array);
-    }
+    let mut arrays = concat_arrays(df).await?;  
     let new_col: ArrayRef = Arc::new(StringArray::from(data));
     arrays.push(new_col);
-    
     let schema_new_col = Schema::new(vec![Field::new(col_name, DataType::Utf8, true)]);
     let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_new_col])?;
     let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
@@ -98,6 +61,60 @@ pub async fn add_str_col_to_df(ctx: SessionContext, df: DataFrame, data: Vec<&st
 
     Ok(res)
 }
+
+// todo
+// Add generic column from vector to existing dataframe 
+// pub async fn add_col_to_df<T>(ctx: SessionContext, df: DataFrame, data: Vec<T>, col_name: &str, data_type: DataType) -> Result<DataFrame> 
+// where 
+//     // T: ArrowPrimitiveType,
+//     // PrimitiveArray<T>: From<Vec<T>>,
+//     // PrimitiveArray<T>: From<Vec<i32>>,
+//     // i64: From<<T as ArrowPrimitiveType>::Native>,
+//     // Vec<<Int32Type as ArrowPrimitiveType>::Native>,
+//     PrimitiveArray<Int32Type>: From<Vec<T>>,
+//     PrimitiveArray<Float32Type>: From<Vec<T>>,
+// {
+//     let schema = df.schema().clone();
+//     let batches = df.collect().await?;
+//     let batches = batches.iter().collect::<Vec<_>>();
+//     let field_num = schema.fields().len();
+//     let mut arrays = Vec::with_capacity(field_num);
+//     for i in 0..field_num {
+//         let array = batches
+//             .iter()
+//             .map(|batch| batch.column(i).as_ref())
+//             .collect::<Vec<_>>();
+//         let array = concat(&array)?;
+//         arrays.push(array);
+//     }
+
+//     let (new_col, schema_new_col) = match data_type {
+//         DataType::Int32 => {
+//             let new_col: ArrayRef = Arc::new(Int32Array::from(data));
+//             // let new_col: PrimitiveArray<Int32Type> = data.into();
+//             let schema_new_col = Schema::new(vec![Field::new(col_name, DataType::Int32, true)]);
+//             (new_col, schema_new_col)
+//         },
+//         DataType::Float32 => {
+//             let new_col: ArrayRef = Arc::new(Float32Array::from(data));
+//             let schema_new_col = Schema::new(vec![Field::new(col_name, DataType::Float32, true)]);
+//             (new_col, schema_new_col)
+//         },
+//         // DataType::Utf8 => {
+//         //     let new_col: ArrayRef = Arc::new(StringArray::from(data));
+//         //     let schema_new_col = Schema::new(vec![Field::new(col_name, DataType::Utf8, true)]);
+//         //     (new_col, schema_new_col)
+//         // },
+//         _ => unimplemented!()
+//     };
+
+//     arrays.push(new_col);
+//     let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_new_col])?;
+//     let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
+//     let res = ctx.read_batch(batch)?;
+
+//     Ok(res)
+// }
 
 /// Select all columns except to_exclude
 pub fn select_all_exclude(df: DataFrame, to_exclude: &[&str]) -> Result<DataFrame> {
@@ -124,7 +141,7 @@ pub fn get_column_names(df: DataFrame) -> Vec<String> {
         .collect::<Vec<_>>()
 }
 
-/// Concat arrays per column
+/// Concat arrays per column for dataframe
 pub async fn concat_arrays(df: DataFrame) -> Result<Vec<ArrayRef>> {
     let schema = df.schema().clone();
     let batches = df.collect().await?;

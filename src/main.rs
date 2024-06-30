@@ -12,17 +12,18 @@ async fn main() -> Result<()> {
 
     let ctx = SessionContext::new(); 
     // let df = ctx.read_parquet("data/foo.parquet", ParquetReadOptions::default()).await?;
-    // let df1 = get_df().await?;
-    // let df2 = get_df().await?;
-    // df1.show().await?;
+    let df1 = get_df()?;
+    // let df2 = get_df()?;
+    df1.show().await?;
     // df2.show().await?;
     // let df2 = get_df2().await?.with_column_renamed("id", "id2")?;
     // let res = concat_dfs(ctx, vec![df1, df2]).await?;
     // res.show().await?;
-    let df = get_df()?;
-    let data = vec![42, 43, 44];
-    let res = add_int_col_to_df(ctx, df, data, "data").await?;
-    res.show().await?;
+    // let df = get_df()?;
+    // let data = vec![42, 43, 44];
+    // let res = add_col_to_df(ctx, df, data, "new_col", datafusion::arrow::datatypes::DataType::Int32).await?;
+    // let res = add_int_col_to_df(ctx, df, data, "data").await?;
+    // res.show().await?;
 
     // let res = df1
     //     .join(df2, JoinType::Inner, &["id"], &["id2"], None)?
