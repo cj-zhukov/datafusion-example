@@ -8,7 +8,8 @@ use itertools::Itertools;
 use serde_json::{Map, Value};
 use tokio_stream::StreamExt;
 
-// create json like string column by creating extra df and joining later, df must have primary_key with int type
+/// Create json like string column by creating extra df and joining later, df must have primary key with int type.
+/// Consider using df_cols_to_json from lib.rs because it's faster
 pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], pk: &str, new_col: Option<&str>, drop_pk: Option<bool>) -> Result<DataFrame> {
     let mut cols_new = cols.iter().map(|x| x.to_owned()).collect::<Vec<_>>();
     cols_new.push(pk);
@@ -84,7 +85,8 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
     Ok(res)
 }
 
-// create json like string column by creating extra df and joining later
+/// Create json like string column by creating extra df and joining later.
+/// Consider using df_cols_to_json from lib.rs because it's faster
 pub async fn df_cols_to_json2(ctx: SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
     let pk = "pk";
     let df = add_pk_to_df(ctx.clone(), df, pk).await?;
@@ -168,7 +170,7 @@ mod tests {
             Field::new("data", DataType::Int32, true),
         ]);
         let batch = RecordBatch::try_new(
-            schema.clone().into(),
+            schema.into(),
             vec![
                 Arc::new(Int32Array::from(vec![1, 2, 3])),
                 Arc::new(Int32Array::from(vec![1, 2, 3])),
@@ -178,7 +180,7 @@ mod tests {
         ).unwrap();
     
         let ctx = SessionContext::new();
-        let df = ctx.read_batch(batch.clone()).unwrap();
+        let df = ctx.read_batch(batch).unwrap();
         let res = df_cols_to_json(ctx, df, &["name", "data"], "pkey", Some("metadata"), Some(true)).await.unwrap();
 
         assert_eq!(res.schema().fields().len(), 2);
@@ -207,7 +209,7 @@ mod tests {
             Field::new("data", DataType::Int32, true),
         ]);
         let batch = RecordBatch::try_new(
-            schema.clone().into(),
+            schema.into(),
             vec![
                 Arc::new(Int32Array::from(vec![1, 2, 3])),
                 Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
@@ -216,7 +218,7 @@ mod tests {
         ).unwrap();
     
         let ctx = SessionContext::new();
-        let df = ctx.read_batch(batch.clone()).unwrap();
+        let df = ctx.read_batch(batch).unwrap();
         let res = df_cols_to_json2(ctx, df, &["name", "data"], Some("metadata")).await.unwrap();
 
         assert_eq!(res.schema().fields().len(), 2); // columns count

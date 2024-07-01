@@ -90,7 +90,7 @@ pub async fn add_any_str_col_to_df<T: ByteArrayType>(ctx: SessionContext, df: Da
     Ok(res)
 }
 
-/// Select all columns except to_exclude
+/// Select dataframe with all columns except to_exclude
 pub fn select_all_exclude(df: DataFrame, to_exclude: &[&str]) -> Result<DataFrame> {
     let columns = df
         .schema()
@@ -198,7 +198,7 @@ pub async fn df_cols_to_struct(ctx: SessionContext, df: DataFrame, cols: &[&str]
         let arr = batch.column_by_name(col).unwrap().clone();
         struct_array_data.push((Arc::new(field), arr));
     }
-    let df_struct = ctx.read_batch(batch.clone())?.select_columns(cols)?;
+    let df_struct = ctx.read_batch(batch)?.select_columns(cols)?;
     let fields = df_struct.schema().clone().as_arrow().fields().clone();
     let struct_array = StructArray::from(struct_array_data);
     let struct_array_schema = Schema::new(vec![Field::new(new_col.unwrap_or("new_col"), DataType::Struct(fields), true)]);
@@ -255,7 +255,7 @@ mod tests {
             Field::new("data", DataType::Int32, true),
         ]);
         let batch = RecordBatch::try_new(
-            schema.clone().into(),
+            schema.into(),
             vec![
                 Arc::new(Int32Array::from(vec![1, 2, 3])),
                 Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
@@ -264,7 +264,7 @@ mod tests {
         ).unwrap();
     
         let ctx = SessionContext::new();
-        let df = ctx.read_batch(batch.clone()).unwrap();
+        let df = ctx.read_batch(batch).unwrap();
         let cols = get_column_names(df);
         assert_eq!(cols, vec!["id", "name", "data"]);
     }
@@ -297,7 +297,7 @@ mod tests {
             Field::new("data", DataType::Int32, true),
         ]);
         let batch = RecordBatch::try_new(
-            schema.clone().into(),
+            schema.into(),
             vec![
                 Arc::new(Int32Array::from(vec![1, 2, 3])),
                 Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
@@ -306,7 +306,7 @@ mod tests {
         ).unwrap();
     
         let ctx = SessionContext::new();
-        let df = ctx.read_batch(batch.clone()).unwrap();
+        let df = ctx.read_batch(batch).unwrap();
         let arrays = concat_arrays(df).await.unwrap();
         assert_eq!(arrays.len(), 3);
 
@@ -330,7 +330,7 @@ mod tests {
             Field::new("data", DataType::Int32, true),
         ]);
         let batch = RecordBatch::try_new(
-            schema.clone().into(),
+            schema.into(),
             vec![
                 Arc::new(Int32Array::from(vec![1, 2, 3])),
                 Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
@@ -339,7 +339,7 @@ mod tests {
         ).unwrap();
     
         let ctx = SessionContext::new();
-        let df = ctx.read_batch(batch.clone()).unwrap();
+        let df = ctx.read_batch(batch).unwrap();
         let res = df_cols_to_json(ctx, df, &["name", "data"], Some("metadata")).await.unwrap();
 
         assert_eq!(res.schema().fields().len(), 2); // columns count
@@ -368,7 +368,7 @@ mod tests {
             Field::new("data", DataType::Int32, true),
         ]);
         let batch = RecordBatch::try_new(
-            schema.clone().into(),
+            schema.into(),
             vec![
                 Arc::new(Int32Array::from(vec![1, 2, 3])),
                 Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
@@ -377,7 +377,7 @@ mod tests {
         ).unwrap();
     
         let ctx = SessionContext::new();
-        let df = ctx.read_batch(batch.clone()).unwrap();
+        let df = ctx.read_batch(batch).unwrap();
         let res = df_cols_to_struct(ctx, df, &["name", "data"], Some("metadata")).await.unwrap();
 
         assert_eq!(res.schema().fields().len(), 2); // columns count
@@ -407,7 +407,7 @@ mod tests {
             Field::new("data", DataType::Int32, true),
         ]);
         let batch = RecordBatch::try_new(
-            schema.clone().into(),
+            schema.into(),
             vec![
                 Arc::new(Int32Array::from(vec![1, 2, 3])),
                 Arc::new(Int32Array::from(vec![1, 2, 3])),
@@ -417,7 +417,7 @@ mod tests {
         ).unwrap();
     
         let ctx = SessionContext::new();
-        let df = ctx.read_batch(batch.clone()).unwrap();
+        let df = ctx.read_batch(batch).unwrap();
         let res = select_all_exclude(df, &["pkey", "data"]).unwrap();
         
         assert_eq!(res.schema().fields().len(), 2); // columns count
@@ -446,7 +446,7 @@ mod tests {
             Field::new("data", DataType::Int32, true),
         ]);
         let batch = RecordBatch::try_new(
-            schema.clone().into(),
+            schema.into(),
             vec![
                 Arc::new(Int32Array::from(vec![1, 2, 3])),
                 Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
@@ -455,7 +455,7 @@ mod tests {
         ).unwrap();
     
         let ctx = SessionContext::new();
-        let df = ctx.read_batch(batch.clone()).unwrap();
+        let df = ctx.read_batch(batch).unwrap();
 
         let res = add_pk_to_df(ctx, df, "pk").await.unwrap();
 
@@ -485,7 +485,7 @@ mod tests {
             Field::new("data", DataType::Int32, true),
         ]);
         let batch = RecordBatch::try_new(
-            schema.clone().into(),
+            schema.into(),
             vec![
                 Arc::new(Int32Array::from(vec![1, 2, 3])),
                 Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
@@ -494,7 +494,7 @@ mod tests {
         ).unwrap();
     
         let ctx = SessionContext::new();
-        let df1 = ctx.read_batch(batch.clone()).unwrap();
+        let df1 = ctx.read_batch(batch).unwrap();
         let df2 = df1.clone();
 
         let res = concat_dfs(ctx, vec![df1, df2]).await.unwrap();
@@ -527,7 +527,7 @@ mod tests {
             Field::new("name", DataType::Utf8, true),
         ]);
         let batch = RecordBatch::try_new(
-            schema.clone().into(),
+            schema.into(),
             vec![
                 Arc::new(Int32Array::from(vec![1, 2, 3])),
                 Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
@@ -535,7 +535,7 @@ mod tests {
         ).unwrap();
     
         let ctx = SessionContext::new();
-        let df = ctx.read_batch(batch.clone()).unwrap();
+        let df = ctx.read_batch(batch).unwrap();
 
         let data = vec![42, 43, 44];
         let res = add_int_col_to_df(ctx, df, data, "data").await.unwrap();
@@ -565,7 +565,7 @@ mod tests {
             Field::new("data", DataType::Int32, true),
         ]);
         let batch = RecordBatch::try_new(
-            schema.clone().into(),
+            schema.into(),
             vec![
                 Arc::new(Int32Array::from(vec![1, 2, 3])),
                 Arc::new(Int32Array::from(vec![42, 43, 44])),
@@ -573,7 +573,7 @@ mod tests {
         ).unwrap();
     
         let ctx = SessionContext::new();
-        let df = ctx.read_batch(batch.clone()).unwrap();
+        let df = ctx.read_batch(batch).unwrap();
 
         let data = vec!["foo", "bar", "baz"];
         let res = add_str_col_to_df(ctx, df, data, "name").await.unwrap();
@@ -603,7 +603,7 @@ mod tests {
             Field::new("data", DataType::Int32, true),
         ]);
         let batch = RecordBatch::try_new(
-            schema.clone().into(),
+            schema.into(),
             vec![
                 Arc::new(Int32Array::from(vec![1, 2, 3])),
                 Arc::new(Int32Array::from(vec![42, 43, 44])),
@@ -611,7 +611,7 @@ mod tests {
         ).unwrap();
     
         let ctx = SessionContext::new();
-        let df = ctx.read_batch(batch.clone()).unwrap();
+        let df = ctx.read_batch(batch).unwrap();
 
         let data = vec![1, 2, 3];
         let data_col = Int32Array::from(data);
@@ -646,7 +646,7 @@ mod tests {
             Field::new("data", DataType::Int32, true),
         ]);
         let batch = RecordBatch::try_new(
-            schema.clone().into(),
+            schema.into(),
             vec![
                 Arc::new(Int32Array::from(vec![1, 2, 3])),
                 Arc::new(Int32Array::from(vec![42, 43, 44])),
@@ -654,7 +654,7 @@ mod tests {
         ).unwrap();
     
         let ctx = SessionContext::new();
-        let df = ctx.read_batch(batch.clone()).unwrap();
+        let df = ctx.read_batch(batch).unwrap();
 
         let data = vec!["foo", "bar", "baz"];
         let data_col = StringArray::from(data);
