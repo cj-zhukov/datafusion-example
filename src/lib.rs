@@ -245,7 +245,7 @@ pub async fn write_df_to_file(df: DataFrame, file_path: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use datafusion::{arrow::array::{Array, Float64Array}, assert_batches_eq};
+    use datafusion::{arrow::array::{Array, Float64Array, LargeStringArray}, assert_batches_eq};
 
     #[test]
     fn test_get_column_names() {
@@ -658,21 +658,25 @@ mod tests {
 
         let data = vec!["foo", "bar", "baz"];
         let data_col = StringArray::from(data);
-        let res = add_any_str_col_to_df(ctx, df, data_col, "name").await.unwrap();
+        let df = add_any_str_col_to_df(ctx.clone(), df, data_col, "col1").await.unwrap();
 
-        assert_eq!(res.schema().fields().len(), 3); // columns count
+        let data = vec!["foo", "bar", "baz"];
+        let data_col = LargeStringArray::from(data);
+        let res = add_any_str_col_to_df(ctx, df, data_col, "col2").await.unwrap();
+
+        assert_eq!(res.schema().fields().len(), 4); // columns count
         assert_eq!(res.clone().count().await.unwrap(), 3); // rows count
         
         let rows = res.sort(vec![col("id").sort(true, true)]).unwrap();
         assert_batches_eq!(
             &[
-                "+----+------+------+",
-                "| id | data | name |",
-                "+----+------+------+",
-                "| 1  | 42   | foo  |",
-                "| 2  | 43   | bar  |",
-                "| 3  | 44   | baz  |",
-                "+----+------+------+",
+                "+----+------+------+------+",
+                "| id | data | col1 | col2 |",
+                "+----+------+------+------+",
+                "| 1  | 42   | foo  | foo  |",
+                "| 2  | 43   | bar  | bar  |",
+                "| 3  | 44   | baz  | baz  |",
+                "+----+------+------+------+",
             ],
             &rows.collect().await.unwrap()
         );
