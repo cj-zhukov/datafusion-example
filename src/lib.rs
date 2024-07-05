@@ -3,7 +3,7 @@ pub mod scalarvalue;
 pub mod examples;
 pub mod saved;
 
-use std::io::{Cursor, Write};
+use std::io::Cursor;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -15,7 +15,7 @@ use datafusion::prelude::*;
 use parquet::arrow::{AsyncArrowWriter, ParquetRecordBatchStreamBuilder};
 use serde_json::{Map, Value};
 use tokio::fs::File;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_stream::StreamExt;
 use futures_util::TryStreamExt;
 
@@ -236,8 +236,8 @@ pub async fn write_df_to_file(df: DataFrame, file_path: &str) -> Result<()> {
         writer.write(&batch).await?;
     }
     writer.close().await?;
-    let mut file = std::fs::File::create(file_path)?;
-    file.write_all(&buf)?;
+    let mut file = File::create(file_path).await?;
+    file.write_all(&buf).await?;
 
     Ok(())
 }

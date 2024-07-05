@@ -91,9 +91,9 @@ pub async fn write_to_s3(ctx: SessionContext, bucket: &str, region: &str, key: &
     Ok(())
 }
 
+/// Write dataframe to aws s3 
 pub async fn write_df_to_s3(client: Client, bucket: &str, key: &str, df: DataFrame) -> Result<()> {
     let mut buf = vec![];
-    // let props = default_builder(&ConfigOptions::default())?.build();
     let schema = Schema::from(df.clone().schema());
     let mut stream = df.execute_stream().await.context("could not create stream from df")?;
     let mut writer = AsyncArrowWriter::try_new(&mut buf, schema.into(), None).context("could not create writer")?;
@@ -154,6 +154,7 @@ pub async fn write_df_to_s3(client: Client, bucket: &str, key: &str, df: DataFra
     Ok(())
 }
 
+/// Write dataframe's record batches to aws s3 
 pub async fn write_batches_to_s3(client: Client, bucket: &str, key: &str, batches: Vec<RecordBatch>) -> Result<()> {
     let mut buf = vec![];
     let schema = batches[0].schema();
