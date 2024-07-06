@@ -1,3 +1,4 @@
+use crate::scalarvalue::ScalarValueNew;
 use crate::utils::df_cols_to_json;
 
 use std::collections::HashMap;
@@ -804,6 +805,96 @@ pub async fn df_cols_to_struct_example() -> Result<()> {
         .select_columns(&["id", "foo", "metadata"])?;
 
     res.show().await?;
+
+    Ok(())
+}
+
+pub async fn add_column_with_scalar_new_example() -> Result<()> {
+    let ctx = SessionContext::new();
+    let schema1 = Schema::new(vec![
+        Field::new("id", DataType::Int32, false),
+        Field::new("name", DataType::Utf8, true),
+    ]);
+    let batch1 = RecordBatch::try_new(
+        schema1.clone().into(),
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])),
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+        ],
+    )?;
+    let df1 = ctx.read_batch(batch1.clone())?;
+
+    let schema2 = Schema::new(vec![
+        Field::new("id", DataType::Int32, false),
+        Field::new("data", DataType::Int32, true),
+    ]);
+    let batch2 = RecordBatch::try_new(
+        schema2.clone().into(),
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])),
+            Arc::new(Int32Array::from(vec![42, 43, 44])),
+        ],
+    )?;
+    let df2 = ctx
+        .read_batch(batch2.clone())?
+        .with_column_renamed("id", "id2")?;
+
+    let df = df1
+        .join(df2, JoinType::Inner, &["id"], &["id2"], None)?
+        .select_columns(&["id", "name", "data"])?;
+
+    let mut stream = df.execute_stream().await?; 
+    let mut columns: HashMap<usize, Vec<ScalarValueNew>> = HashMap::new();
+    while let Some(batch) = stream.next().await.transpose()? {
+        for i in 0..batch.num_columns() {
+            let arr = batch.column(i);
+            let value = ScalarValueNew::try_from_array(arr, 0).unwrap();
+            let data = vec![value];
+            match columns.get_mut(&i) {
+                Some(val) => {
+                    val.extend(data);
+                },
+                None => {
+                    columns.insert(i, data);
+                }
+            }
+        }        
+    }
+    println!("columns: {:?}", columns);
+    println!("len: {:?}", columns.len());
+
+    let mut id_all = vec![];
+    let x = columns[&0].clone();
+    for column in x {
+        if let ScalarValueNew::Int32(res) = column {
+            id_all.push(res);
+        }
+    }
+    let mut name_all = vec![];
+    let x = columns[&1].clone();
+    for column in x {
+        if let ScalarValueNew::Utf8(res) = column {
+            name_all.push(res);
+        }
+    }
+    let mut data_all = vec![];
+    let x = columns[&2].clone();
+    for column in x {
+        if let ScalarValueNew::Int32(res) = column {
+            data_all.push(res);
+        }
+    }
+
+    let id: ArrayRef = Arc::new(Int32Array::from(id_all));
+    let name: ArrayRef = Arc::new(StringArray::from(name_all));
+    let data: ArrayRef = Arc::new(Int32Array::from(data_all));
+    let record_batch = RecordBatch::try_from_iter_with_nullable(vec![
+        ("id", id, true),
+        ("name", name, true),
+        ("data", data, true),
+    ])?;
+    let df = ctx.read_batch(record_batch)?;
+    df.show().await?;
 
     Ok(())
 }
