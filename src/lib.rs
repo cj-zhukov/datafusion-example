@@ -14,5 +14,5 @@ pub mod scalarvalue;
 /// Consider using tools from utils instead
 pub mod saved;
 
-// Tools and helpers for datafusion
+/// Tools and helpers for datafusion
 pub mod utils;
