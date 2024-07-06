@@ -1,4 +1,4 @@
-use crate::add_pk_to_df;
+use crate::utils::add_pk_to_df;
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -9,7 +9,6 @@ use serde_json::{Map, Value};
 use tokio_stream::StreamExt;
 
 /// Create json like string column by creating extra df and joining later, df must have primary key with int type.
-/// Consider using df_cols_to_json from lib.rs because it's faster
 pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], pk: &str, new_col: Option<&str>, drop_pk: Option<bool>) -> Result<DataFrame> {
     let mut cols_new = cols.iter().map(|x| x.to_owned()).collect::<Vec<_>>();
     cols_new.push(pk);
@@ -86,7 +85,6 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
 }
 
 /// Create json like string column by creating extra df and joining later.
-/// Consider using df_cols_to_json from lib.rs because it's faster
 pub async fn df_cols_to_json2(ctx: SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
     let pk = "pk";
     let df = add_pk_to_df(ctx.clone(), df, pk).await?;

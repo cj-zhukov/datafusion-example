@@ -1,4 +1,4 @@
-use crate::df_cols_to_json;
+use crate::utils::df_cols_to_json;
 
 use std::collections::HashMap;
 use std::sync::Arc;
