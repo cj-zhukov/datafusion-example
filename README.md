@@ -1,1 +1,1 @@
-Datafusion examples in Rust
+Datafusion utils, helpers and examples in Rust
