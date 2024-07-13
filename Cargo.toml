@@ -1,5 +1,5 @@
 [package]
-name = "dev"
+name = "datafusion_example"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 futures-util = "0.3"
-datafusion = { version = "39", features = ["default"] }
+datafusion = { version = "40", features = ["default"] }
 arrow-json = "52"
 parquet = "52"
 object_store = { version = "0.10", features = ["aws", "cloud"] }
@@ -17,5 +17,5 @@ serde_json = "1.0.91"
 itertools = "0.13"
 aws-config = "1"
 aws-sdk-s3 = "1"
-aws-creds = "0.36"
+aws-creds = "0.37"
 url = "2"

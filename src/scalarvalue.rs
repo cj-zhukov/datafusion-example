@@ -67,7 +67,7 @@ pub fn downcast_example() {
         ScalarValue::Int32(None),
         ScalarValue::Int32(Some(2))
     ];
-    let result = ScalarValue::new_list_from_iter(scalars.into_iter(), &DataType::Int32);
+    let result = ScalarValue::new_list_from_iter(scalars.into_iter(), &DataType::Int32, true);
     let expected = ListArray::from_iter_primitive::<Int32Type, _, _>(
         vec![
         Some(vec![Some(1), None, Some(2)])
