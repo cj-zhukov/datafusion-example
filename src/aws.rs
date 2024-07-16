@@ -1,7 +1,9 @@
 use std::sync::Arc;
+use std::io::Cursor;
 
 use anyhow::{Result, Context};
 use aws_config::{BehaviorVersion, Region, retry::RetryConfig};
+use aws_sdk_s3::operation::get_object::GetObjectOutput;
 use awscreds::Credentials;
 use aws_sdk_s3::Client;
 use aws_sdk_s3::config::Builder;
@@ -12,8 +14,9 @@ use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::datatypes::Schema;
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::prelude::*;
+use futures_util::TryStreamExt;
 use object_store::aws::AmazonS3Builder;
-use parquet::arrow::AsyncArrowWriter;
+use parquet::arrow::{AsyncArrowWriter, ParquetRecordBatchStreamBuilder};
 use tokio_stream::StreamExt;
 use url::Url;
 
@@ -33,6 +36,41 @@ pub async fn get_aws_client(region: &str) -> Client {
     let config = config_builder.build();
    
     Client::from_conf(config)
+}
+
+/// Get aws GetObjectOutput
+pub async fn get_aws_object(client: Client, bucket: &str, key: &str) -> Result<GetObjectOutput> {
+    let req = client
+        .get_object()
+        .bucket(bucket)
+        .key(key);
+
+    let res = req.send().await?;
+
+    Ok(res)
+}
+
+/// Read file from aws s3 
+pub async fn read_file(client: Client, bucket: &str, key: &str) -> Result<Vec<u8>> {
+    let mut buf = Vec::new();
+    let mut object = get_aws_object(client, bucket, key).await?;
+    while let Some(bytes) = object.body.try_next().await? {
+        buf.extend(bytes.to_vec());
+    }
+
+    Ok(buf)
+}
+
+/// Read parquet file to dataframe
+pub async fn read_file_to_df(client: Client, ctx: SessionContext, bucket: &str, key: &str) -> Result<DataFrame> {
+    let buf = read_file(client, bucket, key).await?;
+    let stream = ParquetRecordBatchStreamBuilder::new(Cursor::new(buf))
+        .await?
+        .build()?;
+    let batches = stream.try_collect::<Vec<_>>().await?;
+    let res = ctx.read_batches(batches)?;
+
+    Ok(res)
 }
 
 pub async fn read_from_s3(ctx: SessionContext, bucket: &str, region: &str, key: &str) -> Result<DataFrame> {
