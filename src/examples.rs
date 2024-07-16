@@ -33,18 +33,49 @@ pub async fn simple() -> Result<()> {
     // declare a new context. In spark API, this corresponds to a new spark SQLsession
     let ctx = SessionContext::new();
 
+    // create df
+    // let df = ctx.read_batch(batch)?;
+
     // declare a table in memory. In spark API, this corresponds to createDataFrame(...)
     ctx.register_batch("t", batch)?;
     let df = ctx.table("t").await?;
 
-    // filter
+    // query table
     // let df = ctx.
-    //     sql("SELECT * FROM t \
-    //         WHERE id > 10").await?;        
+    //     sql("select * from t \
+    //         where id > 10").await?;        
   
     df.show().await?;
 
     Ok(())
+}
+
+pub async fn simple_sql() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("name", DataType::Utf8, false),
+            Field::new("data", DataType::Int32, false),
+        ]));
+    
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(Int32Array::from(vec![1, 2, 3])),
+                Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+                Arc::new(Int32Array::from(vec![42, 43, 44])),
+            ],
+        )?;
+
+        let ctx = SessionContext::new();
+        let df = ctx.read_batch(batch)?;
+
+        // query df using sql
+        let sql = r#"id >= 2 and data >= 42 and name in ('foo', 'bar')"#;
+        let filter = df.parse_sql_expr(sql)?;
+        let res = df.filter(filter)?;
+        res.show().await?;
+
+        Ok(())
 }
 
 pub fn get_df() -> Result<DataFrame> {
