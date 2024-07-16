@@ -14,6 +14,14 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_stream::StreamExt;
 use futures_util::TryStreamExt;
 
+/// Query dataframe with sql
+pub async fn df_sql(df: DataFrame, sql: &str) -> Result<DataFrame> {
+    let filter = df.parse_sql_expr(sql)?;
+    let res = df.filter(filter)?;
+
+    Ok(res)
+}
+
 /// Add auto-increment column to dataframe
 pub async fn add_pk_to_df(ctx: SessionContext, df: DataFrame, col_name: &str) -> Result<DataFrame> {
     let schema = df.schema().clone();
@@ -672,6 +680,43 @@ mod tests {
                 "| 2  | 43   | bar  | bar  |",
                 "| 3  | 44   | baz  | baz  |",
                 "+----+------+------+------+",
+            ],
+            &rows.collect().await.unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_df_sql() {
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("name", DataType::Utf8, true),
+            Field::new("data", DataType::Int32, true),
+        ]);
+        let batch = RecordBatch::try_new(
+            schema.into(),
+            vec![
+                Arc::new(Int32Array::from(vec![1, 2, 3])),
+                Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+                Arc::new(Int32Array::from(vec![42, 43, 44])),
+            ],
+        ).unwrap();
+    
+        let ctx = SessionContext::new();
+        let df = ctx.read_batch(batch).unwrap();
+        let sql = r#"id > 2 and data > 43 and name in ('foo', 'bar', 'baz')"#;
+        let res = df_sql(df, sql).await.unwrap();
+
+        assert_eq!(res.schema().fields().len(), 3);
+        assert_eq!(res.clone().count().await.unwrap(), 1);
+        
+        let rows = res.sort(vec![col("id").sort(true, true)]).unwrap();
+        assert_batches_eq!(
+            &[
+                "+----+------+------+",
+                "| id | name | data |",
+                "+----+------+------+",
+                "| 3  | baz  | 44   |",
+                "+----+------+------+",
             ],
             &rows.collect().await.unwrap()
         );
