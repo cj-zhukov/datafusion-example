@@ -35,7 +35,7 @@ pub async fn get_aws_client(region: &str) -> Client {
     Client::from_conf(config)
 }
 
-pub async fn read_from_s3(ctx: SessionContext, bucket: &str, region: &str, key: &str) -> Result<()> {
+pub async fn read_from_s3(ctx: SessionContext, bucket: &str, region: &str, key: &str) -> Result<DataFrame> {
     let creds = Credentials::default()?;
     let aws_access_key_id = creds.access_key.unwrap();
     let aws_secret_access_key = creds.secret_key.unwrap();
@@ -54,11 +54,10 @@ pub async fn read_from_s3(ctx: SessionContext, bucket: &str, region: &str, key: 
     ctx.runtime_env().register_object_store(&s3_url, Arc::new(s3));
 
     let path = format!("s3://{bucket}/{key}");
-    ctx.register_parquet("foo", &path, ParquetReadOptions::default()).await?;
-    let df = ctx.sql("select * from foo").await?;
-    df.show().await?;
+    ctx.register_parquet("t", &path, ParquetReadOptions::default()).await?;
+    let res = ctx.sql("select * from t").await?;
 
-    Ok(())
+    Ok(res)
 }
 
 pub async fn write_to_s3(ctx: SessionContext, bucket: &str, region: &str, key: &str, df: DataFrame) -> Result<()> {
@@ -94,7 +93,7 @@ pub async fn write_to_s3(ctx: SessionContext, bucket: &str, region: &str, key: &
     Ok(())
 }
 
-/// Write dataframe to aws s3 
+/// Write dataframe to aws s3 by chunk
 pub async fn write_df_to_s3(client: Client, bucket: &str, key: &str, df: DataFrame) -> Result<()> {
     let mut buf = vec![];
     let schema = Schema::from(df.clone().schema());
@@ -157,7 +156,7 @@ pub async fn write_df_to_s3(client: Client, bucket: &str, key: &str, df: DataFra
     Ok(())
 }
 
-/// Write dataframe's record batches to aws s3 
+/// Write dataframe's record batches
 pub async fn write_batches_to_s3(client: Client, bucket: &str, key: &str, batches: Vec<RecordBatch>) -> Result<()> {
     let mut buf = vec![];
     let schema = batches[0].schema();
