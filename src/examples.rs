@@ -1,4 +1,4 @@
-use crate::scalarvalue::ScalarValueNew;
+use crate::scalarvalue::{ScalarValueNew, parse_strings};
 use crate::utils::df_cols_to_json;
 
 use std::collections::HashMap;
@@ -928,4 +928,23 @@ pub async fn add_column_with_scalar_new_example() -> Result<()> {
     df.show().await?;
 
     Ok(())
+}
+
+pub fn downcast_example() {
+    let array = parse_strings(["1", "2", "3"], DataType::Int32);
+    let integers = array.as_any().downcast_ref::<Int32Array>().unwrap();
+    let vals = integers.values();
+    assert_eq!(vals, &[1, 2, 3]);
+
+    let scalars = vec![
+        ScalarValue::Int32(Some(1)),
+        ScalarValue::Int32(None),
+        ScalarValue::Int32(Some(2))
+    ];
+    let result = ScalarValue::new_list_from_iter(scalars.into_iter(), &DataType::Int32, true);
+    let expected = ListArray::from_iter_primitive::<Int32Type, _, _>(
+        vec![
+        Some(vec![Some(1), None, Some(2)])
+        ]);
+    assert_eq!(*result, expected);
 }

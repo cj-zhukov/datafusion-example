@@ -1,7 +1,7 @@
 use std::{str::FromStr, sync::Arc};
 
 use anyhow::{Result, anyhow};
-use datafusion::arrow::array::{Array, ArrayRef, BooleanArray, Int32Array, ListArray, PrimitiveArray, StringArray};
+use datafusion::arrow::array::{Array, ArrayRef, BooleanArray, Int32Array, PrimitiveArray, StringArray};
 use datafusion::arrow::datatypes::{ArrowPrimitiveType, DataType, Int32Type, UInt32Type};
 use datafusion::scalar::ScalarValue;
 
@@ -45,7 +45,7 @@ where
     PrimitiveArray::from_iter(iter.into_iter().map(|val| T::Native::from_str(val).ok()))
 }
 
-fn parse_strings<'a, I>(iter: I, to_data_type: DataType) -> ArrayRef
+pub fn parse_strings<'a, I>(iter: I, to_data_type: DataType) -> ArrayRef
 where
     I: IntoIterator<Item=&'a str>,
 {
@@ -54,25 +54,6 @@ where
        DataType::UInt32 => Arc::new(parse_to_primitive::<UInt32Type, _>(iter)) as _,
        _ => unimplemented!()
    }
-}
-
-pub fn downcast_example() {
-    let array = parse_strings(["1", "2", "3"], DataType::Int32);
-    let integers = array.as_any().downcast_ref::<Int32Array>().unwrap();
-    let vals = integers.values();
-    assert_eq!(vals, &[1, 2, 3]);
-
-    let scalars = vec![
-        ScalarValue::Int32(Some(1)),
-        ScalarValue::Int32(None),
-        ScalarValue::Int32(Some(2))
-    ];
-    let result = ScalarValue::new_list_from_iter(scalars.into_iter(), &DataType::Int32, true);
-    let expected = ListArray::from_iter_primitive::<Int32Type, _, _>(
-        vec![
-        Some(vec![Some(1), None, Some(2)])
-        ]);
-    assert_eq!(*result, expected);
 }
 
 impl ScalarValueNew {

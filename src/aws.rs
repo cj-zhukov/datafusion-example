@@ -73,11 +73,12 @@ pub async fn read_file_to_df(client: Client, ctx: SessionContext, bucket: &str, 
     Ok(res)
 }
 
-pub async fn read_from_s3(ctx: SessionContext, bucket: &str, region: &str, key: &str) -> Result<DataFrame> {
+/// Read parquet file or dir from AWS S3 into dataframe
+pub async fn read_from_s3(ctx: SessionContext, region: &str, bucket: &str, key: &str) -> Result<DataFrame> {
     let creds = Credentials::default()?;
-    let aws_access_key_id = creds.access_key.unwrap();
-    let aws_secret_access_key = creds.secret_key.unwrap();
-    let aws_session_token = creds.session_token.unwrap();
+    let aws_access_key_id = creds.access_key.unwrap_or_default();
+    let aws_secret_access_key = creds.secret_key.unwrap_or_default();
+    let aws_session_token = creds.session_token.unwrap_or_default();
 
     let s3 = AmazonS3Builder::new()
         .with_bucket_name(bucket)
