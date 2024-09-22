@@ -7,15 +7,16 @@ edition = "2021"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 futures-util = "0.3"
-datafusion = { version = "40", features = ["default"] }
-arrow-json = "52"
-parquet = "52"
-object_store = { version = "0.10", features = ["aws", "cloud"] }
+datafusion = { version = "42", features = ["default"] }
+arrow-json = "53"
+parquet = "53"
+object_store = { version = "0.11", features = ["aws", "cloud"] }
 anyhow = "1"
-serde = { version = "1.0.152", features = ["derive"] }
-serde_json = "1.0.91"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 itertools = "0.13"
 aws-config = "1"
 aws-sdk-s3 = "1"
 aws-creds = "0.37"
 url = "2"
+chrono = "0.4.38"
