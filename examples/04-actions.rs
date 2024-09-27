@@ -16,7 +16,7 @@ async fn main() -> Result<()> {
     record_batches_to_json_rows()?;
     df_cols_to_json_example().await?;
     df_cols_to_struct_example().await?;
-    add_column_with_scalar_new_example().await?;
+    scalar_new_example().await?;
 
     Ok(())
 }
@@ -271,7 +271,7 @@ pub async fn df_cols_to_struct_example() -> Result<()> {
     Ok(())
 }
 
-pub async fn add_column_with_scalar_new_example() -> Result<()> {
+pub async fn scalar_new_example() -> Result<()> {
     let ctx = SessionContext::new();
     let schema1 = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
@@ -310,20 +310,21 @@ pub async fn add_column_with_scalar_new_example() -> Result<()> {
     while let Some(batch) = stream.next().await.transpose()? {
         for i in 0..batch.num_columns() {
             let arr = batch.column(i);
-            let value = ScalarValueNew::try_from_array(arr, 0).unwrap();
-            let data = vec![value];
-            match columns.get_mut(&i) {
-                Some(val) => {
-                    val.extend(data);
-                },
-                None => {
-                    columns.insert(i, data);
+            for idx in 0..arr.len() {
+                let value = ScalarValueNew::try_from_array(arr, idx)?;
+                let data = vec![value];
+                match columns.get_mut(&i) {
+                    Some(val) => {
+                        val.extend(data);
+                    },
+                    None => {
+                        columns.insert(i, data);
+                    }
                 }
             }
+
         }        
     }
-    // println!("columns: {:?}", columns);
-    // println!("len: {:?}", columns.len());
 
     let mut id_all = vec![];
     let x = columns[&0].clone();
