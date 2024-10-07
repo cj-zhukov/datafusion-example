@@ -14,6 +14,57 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_stream::StreamExt;
 use futures_util::TryStreamExt;
 
+/// Macro for creating dataframe, similar to polars
+/// # Examples
+/// ```
+/// use datafusion::arrow::array::{Int32Array, StringArray};
+/// use datafusion_example::df;
+/// let id = Int32Array::from(vec![1, 2, 3]);
+/// let name = StringArray::from(vec!["foo", "bar", "baz"]);
+/// let df = df!(
+///    "id" => id,
+///    "name" => name
+///  );
+/// // "+----+------+",
+/// // "| id | name |",
+/// // "+----+------+",
+/// // "| 1  | foo  |",
+/// // "| 2  | bar  |",
+/// // "| 3  | baz  |",
+/// // "+----+------+",
+/// ```
+#[macro_export]
+macro_rules! df {
+    () => {{
+        use datafusion::prelude::*;
+
+        let ctx = SessionContext::new();
+        ctx.read_empty().expect("failed creating empty dataframe")
+    }};
+
+    ($($col_name:expr => $data:expr),+) => {{
+        use datafusion::prelude::*;
+        use datafusion::arrow::array::{RecordBatch, ArrayRef};
+        use datafusion::arrow::datatypes::{Field, Schema};
+        use std::sync::Arc;
+
+        let mut fields = vec![];
+        let mut columns: Vec<ArrayRef> = Vec::new();
+
+        $(
+            let col = Arc::new($data) as ArrayRef;
+            let dtype = col.data_type();
+            fields.push(Field::new($col_name, dtype.clone(), false));
+            columns.push(col);
+        )+
+
+        let schema = Arc::new(Schema::new(fields));
+        let batch = RecordBatch::try_new(schema.clone(), columns).expect("failed creating batch");
+        let ctx = SessionContext::new();
+        ctx.read_batch(batch).expect("failed creating dataframe")
+    }};
+}
+
 /// Query dataframe with sql
 pub async fn df_sql(df: DataFrame, sql: &str) -> Result<DataFrame> {
     let filter = df.parse_sql_expr(sql)?;
@@ -716,6 +767,36 @@ mod tests {
                 "| id | name | data |",
                 "+----+------+------+",
                 "| 3  | baz  | 44   |",
+                "+----+------+------+",
+            ],
+            &rows.collect().await.unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_df_macro() {
+        let id = Int32Array::from(vec![1, 2, 3]);
+        let data = Int32Array::from(vec![42, 43, 44]);
+        let name = StringArray::from(vec!["foo", "bar", "baz"]);
+
+        let df = df!(
+            "id" => id,
+            "data" => data,
+            "name" => name
+        );
+
+        assert_eq!(df.schema().fields().len(), 3); // columns count
+        assert_eq!(df.clone().count().await.unwrap(), 3); // rows count
+        
+        let rows = df.sort(vec![col("id").sort(true, true)]).unwrap();
+        assert_batches_eq!(
+            &[
+                "+----+------+------+",
+                "| id | data | name |",
+                "+----+------+------+",
+                "| 1  | 42   | foo  |",
+                "| 2  | 43   | bar  |",
+                "| 3  | 44   | baz  |",
                 "+----+------+------+",
             ],
             &rows.collect().await.unwrap()
