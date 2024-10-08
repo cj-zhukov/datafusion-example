@@ -14,7 +14,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_stream::StreamExt;
 use futures_util::TryStreamExt;
 
-/// Macro for creating dataframe, similar to polars
+/// Macro for creating dataframe, almost similar to polars
 /// # Examples
 /// ```
 /// use datafusion::arrow::array::{Int32Array, StringArray};
@@ -71,6 +71,14 @@ pub async fn df_sql(df: DataFrame, sql: &str) -> Result<DataFrame> {
     let res = df.filter(filter)?;
 
     Ok(res)
+}
+
+/// Check if dataframe is empty and doesn't have rows
+pub async fn is_empty(df: DataFrame) -> Result<bool> {
+    let batches = df.collect().await?;
+    let is_empty = batches.iter().all(|batch| batch.num_rows() == 0);
+    
+    Ok(is_empty)
 }
 
 /// Add auto-increment column to dataframe
@@ -801,5 +809,30 @@ mod tests {
             ],
             &rows.collect().await.unwrap()
         );
+    }
+
+    #[tokio::test]
+    async fn test_is_empty() {
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("name", DataType::Utf8, true),
+            Field::new("data", DataType::Int32, true),
+        ]);
+        let batch = RecordBatch::try_new(
+            schema.clone().into(),
+            vec![
+                Arc::new(Int32Array::from(vec![1, 2, 3])),
+                Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+                Arc::new(Int32Array::from(vec![42, 43, 44])),
+            ],
+        ).unwrap();
+    
+        let ctx = SessionContext::new();
+        let df = ctx.read_batch(batch).unwrap();
+        assert_eq!(is_empty(df).await.unwrap(), false);
+
+        let batch = RecordBatch::new_empty(schema.into());
+        let df = ctx.read_batch(batch).unwrap();
+        assert_eq!(is_empty(df).await.unwrap(), true);
     }
 }
