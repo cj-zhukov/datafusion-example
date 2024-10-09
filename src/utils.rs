@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use datafusion::arrow::compute::concat;
-use datafusion::arrow::array::{Array, ArrayRef, GenericByteArray, Int32Array, PrimitiveArray, StringArray, StructArray};
+use datafusion::arrow::array::{Array, ArrayRef, BinaryArray, BooleanArray, Float32Array, Float64Array, GenericByteArray, Int32Array, Int64Array, PrimitiveArray, StringArray, StructArray};
 use datafusion::arrow::datatypes::{ArrowPrimitiveType, ByteArrayType, DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::prelude::*;
@@ -177,6 +177,70 @@ pub async fn add_col_to_df(ctx: SessionContext, df: DataFrame, data: ArrayRef, c
     let mut arrays = concat_arrays(df).await?;
     let schema_new_col = Schema::new(vec![Field::new(col_name, data.data_type().clone(), true)]);
     arrays.push(data);
+    let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_new_col])?;
+    let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
+    let res = ctx.read_batch(batch)?;
+
+    Ok(res)
+}
+
+/// Add column to existing dataframe 
+/// # Examples
+/// ```
+/// use datafusion::prelude::*;
+/// use datafusion::arrow::array::{Int32Array, StringArray};
+/// use datafusion_example::{df, utils::{add_col_arr_to_df}};
+/// let id = Int32Array::from(vec![1, 2, 3]);
+/// let df = df!("id" => id);
+/// let name = StringArray::from(vec!["foo", "bar", "baz"]);
+/// let ctx = SessionContext::new();
+/// let res = add_col_arr_to_df(ctx, df, &name, "name");
+/// // "+----+------+",
+/// // "| id | name |",
+/// // "+----+------+",
+/// // "| 1  | foo  |",
+/// // "| 2  | bar  |",
+/// // "| 3  | baz  |",
+/// // "+----+------+",
+/// ```
+pub async fn add_col_arr_to_df(ctx: SessionContext, df: DataFrame, data: &dyn Array, col_name: &str) -> Result<DataFrame> {
+    let schema = df.schema().clone();
+    let mut arrays = concat_arrays(df).await?;
+    let schema_new_col = Schema::new(vec![Field::new(col_name, data.data_type().clone(), true)]);
+    
+    let array: Arc<dyn Array> = match data.data_type() {
+        DataType::Utf8 => { 
+            let array: &StringArray = data.as_any().downcast_ref().unwrap();
+            Arc::new(array.to_owned())
+        },
+        DataType::Int32 => { 
+            let array: &Int32Array = data.as_any().downcast_ref().unwrap();
+            Arc::new(array.to_owned())
+        },
+        DataType::Int64 => { 
+            let array: &Int64Array = data.as_any().downcast_ref().unwrap();
+            Arc::new(array.to_owned())
+        },
+        DataType::Float32 => { 
+            let array: &Float32Array = data.as_any().downcast_ref().unwrap();
+            Arc::new(array.to_owned())
+        },
+        DataType::Float64 => { 
+            let array: &Float64Array = data.as_any().downcast_ref().unwrap();
+            Arc::new(array.to_owned())
+        },
+        DataType::Binary => { 
+            let array: &BinaryArray = data.as_any().downcast_ref().unwrap();
+            Arc::new(array.to_owned())
+        },
+        DataType::Boolean => { 
+            let array: &BooleanArray = data.as_any().downcast_ref().unwrap();
+            Arc::new(array.to_owned())
+        },
+        _ => unimplemented!()
+    };
+
+    arrays.push(array);
     let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_new_col])?;
     let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
     let res = ctx.read_batch(batch)?;
@@ -797,6 +861,43 @@ mod tests {
         let col2 = Arc::new(Float64Array::from(vec![42.0, 43.0, 44.0]));
         let df = add_col_to_df(ctx.clone(), df, col1, "col1").await.unwrap();
         let res = add_col_to_df(ctx, df, col2, "col2").await.unwrap();
+        
+        let rows = res.sort(vec![col("id").sort(true, true)]).unwrap();
+        assert_batches_eq!(
+            &[
+                "+----+------+------+------+",
+                "| id | data | col1 | col2 |",
+                "+----+------+------+------+",
+                "| 1  | 42   | foo  | 42.0 |",
+                "| 2  | 43   | bar  | 43.0 |",
+                "| 3  | 44   | baz  | 44.0 |",
+                "+----+------+------+------+",
+            ],
+            &rows.collect().await.unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_add_col_arr_to_df() {
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("data", DataType::Int32, true),
+        ]);
+        let batch = RecordBatch::try_new(
+            schema.into(),
+            vec![
+                Arc::new(Int32Array::from(vec![1, 2, 3])),
+                Arc::new(Int32Array::from(vec![42, 43, 44])),
+            ],
+        ).unwrap();
+    
+        let ctx = SessionContext::new();
+        let df = ctx.read_batch(batch).unwrap();
+
+        let col1 = StringArray::from(vec!["foo", "bar", "baz"]);
+        let col2 = Float64Array::from(vec![42.0, 43.0, 44.0]);
+        let df = add_col_arr_to_df(ctx.clone(), df, &col1, "col1").await.unwrap();
+        let res = add_col_arr_to_df(ctx, df, &col2, "col2").await.unwrap();
         
         let rows = res.sort(vec![col("id").sort(true, true)]).unwrap();
         assert_batches_eq!(
