@@ -66,6 +66,29 @@ macro_rules! df {
 }
 
 /// Query dataframe with sql
+/// # Examples
+/// ```
+/// use datafusion::prelude::*;
+/// use datafusion::arrow::array::{Int32Array, StringArray};
+/// use datafusion_example::{df, utils::{df_sql}};
+/// let id = Int32Array::from(vec![1, 2, 3]);
+/// let name = StringArray::from(vec!["foo", "bar", "baz"]);
+/// let df = df!("id" => id, "name" => name);
+/// // "+----+------+",
+/// // "| id | name |",
+/// // "+----+------+",
+/// // "| 1  | foo  |",
+/// // "| 2  | bar  |",
+/// // "| 3  | baz  |",
+/// // "+----+------+",
+/// let sql = r#"id > 2 and name in ('foo', 'bar', 'baz')"#; 
+/// let res = df_sql(df, sql);
+/// // "+----+------+",
+/// // "| id | name |",
+/// // "+----+------+",
+/// // "| 3  | baz  |",
+/// // "+----+------+",
+/// ```
 pub async fn df_sql(df: DataFrame, sql: &str) -> Result<DataFrame> {
     let filter = df.parse_sql_expr(sql)?;
     let res = df.filter(filter)?;
