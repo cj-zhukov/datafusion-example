@@ -329,6 +329,25 @@ pub async fn concat_dfs(ctx: SessionContext, dfs: Vec<DataFrame>) -> Result<Data
 }
 
 /// Create json like string column new_col from cols
+/// # Examples
+/// ```
+/// use datafusion::prelude::*;
+/// use datafusion::arrow::array::{Int32Array, StringArray};
+/// use datafusion_example::{df, utils::{df_cols_to_json}};
+/// let id = Int32Array::from(vec![1, 2, 3]);
+/// let name = StringArray::from(vec!["foo", "bar", "baz"]);
+/// let data = Int32Array::from(vec![42, 43, 44]);
+/// let df = df!("id" => id, "name" => name, "data" => data);
+/// let ctx = SessionContext::new();
+/// let res = df_cols_to_json(ctx, df, &["name", "data"], Some("new_col"));
+/// // "+----+--------------------------+",
+/// // "| id | new_col                  |",
+/// // "+----+--------------------------+",
+/// // "| 1  | {"data":42,"name":"foo"} |"#,
+/// // "| 2  | {"data":43,"name":"bar"} |"#,
+/// // "| 3  | {"data":44,"name":"baz"} |"#,
+/// // "+----+--------------------------+",
+/// ```
 pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
     let schema = df.schema().clone();
     let mut arrays = concat_arrays(df).await?;
