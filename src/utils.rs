@@ -388,6 +388,25 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
 }
 
 /// Create nested struct column new_col from cols
+/// # Examples
+/// ```
+/// use datafusion::prelude::*;
+/// use datafusion::arrow::array::{Int32Array, StringArray};
+/// use datafusion_example::{df, utils::{df_cols_to_struct}};
+/// let id = Int32Array::from(vec![1, 2, 3]);
+/// let name = StringArray::from(vec!["foo", "bar", "baz"]);
+/// let data = Int32Array::from(vec![42, 43, 44]);
+/// let df = df!("id" => id, "name" => name, "data" => data);
+/// let ctx = SessionContext::new();
+/// let res = df_cols_to_struct(ctx, df, &["name", "data"], Some("new_col"));
+/// // +----+-----------------------+
+/// // | id | new_col               |
+/// // +----+-----------------------+
+/// // | 1  | {name: foo, data: 42} |
+/// // | 2  | {name: bar, data: 43} |
+/// // | 3  | {name: baz, data: 44} |
+/// // +----+-----------------------+
+/// ```
 pub async fn df_cols_to_struct(ctx: SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
     let schema = df.schema().clone();
     let mut arrays = concat_arrays(df).await?;
