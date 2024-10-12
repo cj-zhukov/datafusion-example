@@ -14,24 +14,24 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_stream::StreamExt;
 use futures_util::TryStreamExt;
 
-/// Macro for creating dataframe, almost similar to polars
+/// Macro for creating dataframe, similar (almost) to polars
 /// # Examples
 /// ```
 /// use datafusion::arrow::array::{Int32Array, StringArray};
-/// use datafusion_example::df;
+/// # use datafusion_example::df;
 /// let id = Int32Array::from(vec![1, 2, 3]);
 /// let name = StringArray::from(vec!["foo", "bar", "baz"]);
 /// let df = df!(
 ///    "id" => id,
 ///    "name" => name
 ///  );
-/// // "+----+------+",
-/// // "| id | name |",
-/// // "+----+------+",
-/// // "| 1  | foo  |",
-/// // "| 2  | bar  |",
-/// // "| 3  | baz  |",
-/// // "+----+------+",
+/// // +----+------+,
+/// // | id | name |,
+/// // +----+------+,
+/// // | 1  | foo  |,
+/// // | 2  | bar  |,
+/// // | 3  | baz  |,
+/// // +----+------+,
 /// ```
 #[macro_export]
 macro_rules! df {
@@ -68,26 +68,25 @@ macro_rules! df {
 /// Query dataframe with sql
 /// # Examples
 /// ```
-/// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
-/// use datafusion_example::{df, utils::{df_sql}};
+/// # use datafusion_example::{df, utils::{df_sql}};
 /// let id = Int32Array::from(vec![1, 2, 3]);
 /// let name = StringArray::from(vec!["foo", "bar", "baz"]);
 /// let df = df!("id" => id, "name" => name);
-/// // "+----+------+",
-/// // "| id | name |",
-/// // "+----+------+",
-/// // "| 1  | foo  |",
-/// // "| 2  | bar  |",
-/// // "| 3  | baz  |",
-/// // "+----+------+",
+/// // +----+------+,
+/// // | id | name |,
+/// // +----+------+,
+/// // | 1  | foo  |,
+/// // | 2  | bar  |,
+/// // | 3  | baz  |,
+/// // +----+------+,
 /// let sql = r#"id > 2 and name in ('foo', 'bar', 'baz')"#; 
 /// let res = df_sql(df, sql);
-/// // "+----+------+",
-/// // "| id | name |",
-/// // "+----+------+",
-/// // "| 3  | baz  |",
-/// // "+----+------+",
+/// // +----+------+,
+/// // | id | name |,
+/// // +----+------+,
+/// // | 3  | baz  |,
+/// // +----+------+,
 /// ```
 pub async fn df_sql(df: DataFrame, sql: &str) -> Result<DataFrame> {
     let filter = df.parse_sql_expr(sql)?;
@@ -105,6 +104,36 @@ pub async fn is_empty(df: DataFrame) -> Result<bool> {
 }
 
 /// Add auto-increment column to dataframe
+/// # Examples
+/// ```
+/// use datafusion::prelude::*;
+/// # use anyhow::Result;
+/// use datafusion::arrow::array::{Int32Array, StringArray};
+/// # use datafusion_example::{df, utils::{add_pk_to_df}};
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
+/// let id = Int32Array::from(vec![1, 2, 3]);
+/// let name = StringArray::from(vec!["foo", "bar", "baz"]);
+/// let df = df!("id" => id, "name" => name);
+/// // +----+------+,
+/// // | id | name |,
+/// // +----+------+,
+/// // | 1  | foo  |,
+/// // | 2  | bar  |,
+/// // | 3  | baz  |,
+/// // +----+------+,
+/// let ctx = SessionContext::new();
+/// let res = add_pk_to_df(ctx, df, "pk").await?;
+/// // +----+------+----+
+/// // | id | name | pk |
+/// // +----+------+----+
+/// // | 1  | foo  | 0  |
+/// // | 2  | bar  | 1  |
+/// // | 3  | baz  | 2  |
+/// // +----+------+----+
+/// # Ok(())
+/// # }
+/// ```
 pub async fn add_pk_to_df(ctx: SessionContext, df: DataFrame, col_name: &str) -> Result<DataFrame> {
     let schema = df.schema().clone();
     let mut arrays = concat_arrays(df).await?;    
@@ -179,21 +208,26 @@ pub async fn add_any_str_col_to_df<T: ByteArrayType>(ctx: SessionContext, df: Da
 /// # Examples
 /// ```
 /// use std::sync::Arc;
+/// # use anyhow::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
-/// use datafusion_example::{df, utils::{add_col_to_df}};
+/// # use datafusion_example::{df, utils::{add_col_to_df}};
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
 /// let id = Int32Array::from(vec![1, 2, 3]);
 /// let df = df!("id" => id);
 /// let name = StringArray::from(vec!["foo", "bar", "baz"]);
 /// let ctx = SessionContext::new();
-/// let res = add_col_to_df(ctx, df, Arc::new(name), "name");
-/// // "+----+------+",
-/// // "| id | name |",
-/// // "+----+------+",
-/// // "| 1  | foo  |",
-/// // "| 2  | bar  |",
-/// // "| 3  | baz  |",
-/// // "+----+------+",
+/// let res = add_col_to_df(ctx, df, Arc::new(name), "name").await?;
+/// // +----+------+,
+/// // | id | name |,
+/// // +----+------+,
+/// // | 1  | foo  |,
+/// // | 2  | bar  |,
+/// // | 3  | baz  |,
+/// // +----+------+,
+/// # Ok(())
+/// # }
 /// ```
 pub async fn add_col_to_df(ctx: SessionContext, df: DataFrame, data: ArrayRef, col_name: &str) -> Result<DataFrame> {
     let schema = df.schema().clone();
@@ -210,21 +244,26 @@ pub async fn add_col_to_df(ctx: SessionContext, df: DataFrame, data: ArrayRef, c
 /// Add column to existing dataframe 
 /// # Examples
 /// ```
+/// # use anyhow::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
-/// use datafusion_example::{df, utils::{add_col_arr_to_df}};
+/// # use datafusion_example::{df, utils::{add_col_arr_to_df}};
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
 /// let id = Int32Array::from(vec![1, 2, 3]);
 /// let df = df!("id" => id);
 /// let name = StringArray::from(vec!["foo", "bar", "baz"]);
 /// let ctx = SessionContext::new();
-/// let res = add_col_arr_to_df(ctx, df, &name, "name");
-/// // "+----+------+",
-/// // "| id | name |",
-/// // "+----+------+",
-/// // "| 1  | foo  |",
-/// // "| 2  | bar  |",
-/// // "| 3  | baz  |",
-/// // "+----+------+",
+/// let res = add_col_arr_to_df(ctx, df, &name, "name").await?;
+/// // +----+------+,
+/// // | id | name |,
+/// // +----+------+,
+/// // | 1  | foo  |,
+/// // | 2  | bar  |,
+/// // | 3  | baz  |,
+/// // +----+------+,
+/// # Ok(())
+/// # }
 /// ```
 pub async fn add_col_arr_to_df(ctx: SessionContext, df: DataFrame, data: &dyn Array, col_name: &str) -> Result<DataFrame> {
     let schema = df.schema().clone();
@@ -272,6 +311,32 @@ pub async fn add_col_arr_to_df(ctx: SessionContext, df: DataFrame, data: &dyn Ar
 }
 
 /// Select dataframe with all columns except to_exclude
+/// # Examples
+/// ```
+/// use datafusion::prelude::*;
+/// use datafusion::arrow::array::{Int32Array, StringArray};
+/// # use datafusion_example::{df, utils::{select_all_exclude}};
+/// let id = Int32Array::from(vec![1, 2, 3]);
+/// let name = StringArray::from(vec!["foo", "bar", "baz"]);
+/// let data = Int32Array::from(vec![42, 43, 44]);
+/// let df = df!("id" => id, "name" => name, "data" => data);
+/// // +----+------+------+
+/// // | id | name | data |
+/// // +----+------+------+
+/// // | 1  | foo  | 42   |
+/// // | 2  | bar  | 43   |
+/// // | 3  | baz  | 44   |
+/// // +----+------+------+
+/// let ctx = SessionContext::new();
+/// let res = select_all_exclude(df, &["name", "data"]);
+/// // +----+
+/// // | id |
+/// // +----+
+/// // | 1  |
+/// // | 2  |
+/// // | 3  |
+/// // +----+
+/// ```
 pub fn select_all_exclude(df: DataFrame, to_exclude: &[&str]) -> Result<DataFrame> {
     let columns = df
         .schema()
@@ -331,22 +396,34 @@ pub async fn concat_dfs(ctx: SessionContext, dfs: Vec<DataFrame>) -> Result<Data
 /// Create json like string column new_col from cols
 /// # Examples
 /// ```
+/// # use anyhow::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
-/// use datafusion_example::{df, utils::{df_cols_to_json}};
+/// # use datafusion_example::{df, utils::{df_cols_to_json}};
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
 /// let id = Int32Array::from(vec![1, 2, 3]);
 /// let name = StringArray::from(vec!["foo", "bar", "baz"]);
 /// let data = Int32Array::from(vec![42, 43, 44]);
 /// let df = df!("id" => id, "name" => name, "data" => data);
+/// // +----+------+------+
+/// // | id | name | data |
+/// // +----+------+------+
+/// // | 1  | foo  | 42   |
+/// // | 2  | bar  | 43   |
+/// // | 3  | baz  | 44   |
+/// // +----+------+------+
 /// let ctx = SessionContext::new();
-/// let res = df_cols_to_json(ctx, df, &["name", "data"], Some("new_col"));
-/// // "+----+--------------------------+",
-/// // "| id | new_col                  |",
-/// // "+----+--------------------------+",
-/// // "| 1  | {"data":42,"name":"foo"} |"#,
-/// // "| 2  | {"data":43,"name":"bar"} |"#,
-/// // "| 3  | {"data":44,"name":"baz"} |"#,
-/// // "+----+--------------------------+",
+/// let res = df_cols_to_json(ctx, df, &["name", "data"], Some("new_col")).await?;
+/// // +----+--------------------------+,
+/// // | id | new_col                  |,
+/// // +----+--------------------------+,
+/// // | 1  | {"data":42,"name":"foo"} |,
+/// // | 2  | {"data":43,"name":"bar"} |,
+/// // | 3  | {"data":44,"name":"baz"} |,
+/// // +----+--------------------------+,
+/// # Ok(())
+/// # }
 /// ```
 pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
     let schema = df.schema().clone();
@@ -390,15 +467,25 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
 /// Create nested struct column new_col from cols
 /// # Examples
 /// ```
+/// # use anyhow::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
-/// use datafusion_example::{df, utils::{df_cols_to_struct}};
+/// # use datafusion_example::{df, utils::{df_cols_to_struct}};
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
 /// let id = Int32Array::from(vec![1, 2, 3]);
 /// let name = StringArray::from(vec!["foo", "bar", "baz"]);
 /// let data = Int32Array::from(vec![42, 43, 44]);
 /// let df = df!("id" => id, "name" => name, "data" => data);
+/// // +----+------+------+
+/// // | id | name | data |
+/// // +----+------+------+
+/// // | 1  | foo  | 42   |
+/// // | 2  | bar  | 43   |
+/// // | 3  | baz  | 44   |
+/// // +----+------+------+
 /// let ctx = SessionContext::new();
-/// let res = df_cols_to_struct(ctx, df, &["name", "data"], Some("new_col"));
+/// let res = df_cols_to_struct(ctx, df, &["name", "data"], Some("new_col")).await;
 /// // +----+-----------------------+
 /// // | id | new_col               |
 /// // +----+-----------------------+
@@ -406,6 +493,8 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
 /// // | 2  | {name: bar, data: 43} |
 /// // | 3  | {name: baz, data: 44} |
 /// // +----+-----------------------+
+/// # Ok(())
+/// # }
 /// ```
 pub async fn df_cols_to_struct(ctx: SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame> {
     let schema = df.schema().clone();
