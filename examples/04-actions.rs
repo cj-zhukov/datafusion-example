@@ -5,7 +5,7 @@ use anyhow::Result;
 use datafusion::arrow::array::{ArrayRef, Int32Array, RecordBatch, StringArray, StructArray};
 use datafusion::arrow::datatypes::{DataType, Field, Fields, Schema};
 use datafusion::prelude::*;
-use datafusion_example::scalarvalue::ScalarValueNew;
+use datafusion_example::utils::scalarvalue::ScalarValueNew;
 use itertools::Itertools;
 use serde_json::{Map, Value};
 use tokio_stream::StreamExt;

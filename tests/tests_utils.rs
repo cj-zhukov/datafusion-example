@@ -1,4 +1,4 @@
-use datafusion_example::utils::*;
+use datafusion_example::utils::utils::*;
 use datafusion_example::df;
 
 use std::sync::Arc;

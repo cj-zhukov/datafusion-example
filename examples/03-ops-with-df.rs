@@ -6,7 +6,7 @@ use datafusion::arrow::datatypes::{DataType, Field, Int32Type, Schema};
 use datafusion::arrow::compute::concat;
 use datafusion::{arrow, assert_batches_eq, prelude::*};
 use datafusion::scalar::ScalarValue;
-use datafusion_example::scalarvalue::parse_strings;
+use datafusion_example::utils::scalarvalue::parse_strings;
 
 #[tokio::main]
 async fn main() -> Result<()> {
