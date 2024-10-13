@@ -1,6 +1,6 @@
 use std::{str::FromStr, sync::Arc};
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use datafusion::arrow::array::{Array, ArrayRef, BooleanArray, Int32Array, PrimitiveArray, StringArray};
 use datafusion::arrow::datatypes::{ArrowPrimitiveType, DataType, Int32Type, UInt32Type};
 use datafusion::scalar::ScalarValue;
@@ -62,9 +62,7 @@ impl ScalarValueNew {
             DataType::Boolean => typed_cast!(array, index, BooleanArray, Boolean),
             DataType::Int32 => typed_cast!(array, index, Int32Array, Int32),
             DataType::Utf8 => typed_cast!(array, index, StringArray, Utf8),
-            other => {
-                return Err(anyhow!(format!("Downcast not available for type: {}", other)));
-            }
+            _ => unimplemented!()
         })
     }
 }

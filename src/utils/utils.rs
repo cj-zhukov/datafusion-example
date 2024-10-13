@@ -69,7 +69,7 @@ macro_rules! df {
 /// # Examples
 /// ```
 /// use datafusion::arrow::array::{Int32Array, StringArray};
-/// # use datafusion_example::{df, utils::{df_sql}};
+/// # use datafusion_example::{df, utils::utils::df_sql};
 /// let id = Int32Array::from(vec![1, 2, 3]);
 /// let name = StringArray::from(vec!["foo", "bar", "baz"]);
 /// let df = df!("id" => id, "name" => name);
@@ -109,7 +109,7 @@ pub async fn is_empty(df: DataFrame) -> Result<bool> {
 /// use datafusion::prelude::*;
 /// # use anyhow::Result;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
-/// # use datafusion_example::{df, utils::{add_pk_to_df}};
+/// # use datafusion_example::{df, utils::utils::add_pk_to_df};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 /// let id = Int32Array::from(vec![1, 2, 3]);
@@ -211,7 +211,7 @@ pub async fn add_any_str_col_to_df<T: ByteArrayType>(ctx: SessionContext, df: Da
 /// # use anyhow::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
-/// # use datafusion_example::{df, utils::{add_col_to_df}};
+/// # use datafusion_example::{df, utils::utils::add_col_to_df};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 /// let id = Int32Array::from(vec![1, 2, 3]);
@@ -247,7 +247,7 @@ pub async fn add_col_to_df(ctx: SessionContext, df: DataFrame, data: ArrayRef, c
 /// # use anyhow::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
-/// # use datafusion_example::{df, utils::{add_col_arr_to_df}};
+/// # use datafusion_example::{df, utils::utils::add_col_arr_to_df};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 /// let id = Int32Array::from(vec![1, 2, 3]);
@@ -315,7 +315,7 @@ pub async fn add_col_arr_to_df(ctx: SessionContext, df: DataFrame, data: &dyn Ar
 /// ```
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
-/// # use datafusion_example::{df, utils::{select_all_exclude}};
+/// # use datafusion_example::{df, utils::utils::select_all_exclude};
 /// let id = Int32Array::from(vec![1, 2, 3]);
 /// let name = StringArray::from(vec!["foo", "bar", "baz"]);
 /// let data = Int32Array::from(vec![42, 43, 44]);
@@ -399,7 +399,7 @@ pub async fn concat_dfs(ctx: SessionContext, dfs: Vec<DataFrame>) -> Result<Data
 /// # use anyhow::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
-/// # use datafusion_example::{df, utils::{df_cols_to_json}};
+/// # use datafusion_example::{df, utils::utils::df_cols_to_json};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 /// let id = Int32Array::from(vec![1, 2, 3]);
@@ -470,7 +470,7 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
 /// # use anyhow::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
-/// # use datafusion_example::{df, utils::{df_cols_to_struct}};
+/// # use datafusion_example::{df, utils::utils::df_cols_to_struct};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 /// let id = Int32Array::from(vec![1, 2, 3]);
