@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use datafusion::arrow::array::{ArrayRef, Int32Array, ListArray, RecordBatch, StringArray};
-use datafusion::arrow::datatypes::{DataType, Field, Int32Type, Schema};
+use datafusion::arrow::array::{ArrayRef, AsArray, Float32Array, Int32Array, ListArray, RecordBatch, StringArray};
+use datafusion::arrow::datatypes::{DataType, Field, Float32Type, Int32Type, Schema};
 use datafusion::arrow::compute::concat;
 use datafusion::{arrow, assert_batches_eq, prelude::*};
 use datafusion::scalar::ScalarValue;
 use datafusion_example::utils::scalarvalue::parse_strings;
+use tokio_stream::StreamExt;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -16,7 +17,8 @@ async fn main() -> Result<()> {
     add_str_col().await?;
     assert1().await?;
     assert2().await?;
-    downcast_df();
+    downcast_df().await?;
+    downcast_df2();
 
     Ok(())
 }
@@ -277,7 +279,52 @@ pub async fn assert2() -> Result<()> {
     Ok(())
 }
 
-pub fn downcast_df() {
+pub async fn downcast_df() -> Result<()> {
+    let ctx = SessionContext::new();
+    let schema = Schema::new(vec![
+        Field::new("id", DataType::Int32, false),
+        Field::new("name", DataType::Utf8, true),
+        Field::new("data", DataType::Float32, true),
+    ]);
+    let batch = RecordBatch::try_new(
+        schema.clone().into(),
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])),
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+            Arc::new(Float32Array::from(vec![42.0, 43.0, 44.0])),
+        ],
+    )?;
+    let df = ctx.read_batch(batch.clone())?;
+
+    let mut stream = df.execute_stream().await?;
+    let mut id_vals = vec![];
+    let mut name_vals = vec![];
+    let mut data_vals = vec![];
+    while let Some(batch) = stream.next().await.transpose()? {
+        let ids = batch.column(0).as_primitive::<Int32Type>();
+        for id in ids {
+            id_vals.push(id);
+        }
+
+        let names = batch.column(1).as_string::<i32>();
+        for name in names {
+            let name = name.map(|x| x.to_string());
+            name_vals.push(name);
+        }
+
+        let data_all = batch.column(2).as_primitive::<Float32Type>();
+        for data in data_all {
+            data_vals.push(data);
+        }
+    }
+    println!("{:?}", id_vals);
+    println!("{:?}", name_vals);
+    println!("{:?}", data_vals);
+
+    Ok(())
+}
+
+pub fn downcast_df2() {
     let array = parse_strings(["1", "2", "3"], DataType::Int32);
     let integers = array.as_any().downcast_ref::<Int32Array>().unwrap();
     let vals = integers.values();
