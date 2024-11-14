@@ -89,11 +89,11 @@ pub async fn read_from_s3(ctx: SessionContext, region: &str, bucket: &str, key: 
         .build()?;
 
     let path = format!("s3://{bucket}");
-    let s3_url = Url::parse(&path)?;
+    let s3_url = Url::parse(&path).context("failed parse")?;
     ctx.runtime_env().register_object_store(&s3_url, Arc::new(s3));
 
     let path = format!("s3://{bucket}/{key}");
-    ctx.register_parquet("t", &path, ParquetReadOptions::default()).await?;
+    ctx.register_parquet("t", &path, ParquetReadOptions::default()).await.context("failed register parquet")?;
     let res = ctx.sql("select * from t").await?;
 
     Ok(res)

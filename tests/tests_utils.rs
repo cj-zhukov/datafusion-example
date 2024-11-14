@@ -1,6 +1,3 @@
-use datafusion_example::utils::utils::*;
-use datafusion_example::df;
-
 use std::sync::Arc;
 
 use datafusion::prelude::*;
@@ -8,6 +5,9 @@ use datafusion::arrow::array::{Array, Int32Array, Float64Array, LargeStringArray
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::assert_batches_eq;
 use serde_json::{Map, Value};
+
+use datafusion_example::utils::utils::*;
+use datafusion_example::df;
 
 #[test]
 fn test_get_column_names() {
