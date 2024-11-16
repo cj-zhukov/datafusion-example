@@ -310,7 +310,7 @@ pub async fn add_col_arr_to_df(ctx: SessionContext, df: DataFrame, data: &dyn Ar
     Ok(res)
 }
 
-/// Select dataframe with all columns except to_exclude
+/// Select dataframe with all columns except to_exclude (better use drop_columns)
 /// # Examples
 /// ```
 /// use datafusion::prelude::*;
@@ -458,8 +458,7 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
     let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_new_col])?;
     let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
     let res = ctx.read_batch(batch)?;
-
-    let res = select_all_exclude(res, cols)?;
+    let res = res.drop_columns(cols)?;
 
     Ok(res)
 }
@@ -515,8 +514,7 @@ pub async fn df_cols_to_struct(ctx: SessionContext, df: DataFrame, cols: &[&str]
     let batch_with_struct = RecordBatch::try_new(schema_new.into(), arrays)?;
 
     let res = ctx.read_batch(batch_with_struct)?;
-
-    let res = select_all_exclude(res, cols)?;
+    let res = res.drop_columns(cols)?;
 
     Ok(res)
 }
