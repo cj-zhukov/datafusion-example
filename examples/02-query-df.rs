@@ -30,7 +30,7 @@ pub async fn query1() -> Result<()> {
     )?;
 
     let ctx = SessionContext::new();
-    // how to use RecordBatch as table
+    // how to register RecordBatch as table
     ctx.register_batch("t", batch)?;
 
     let df = ctx.
@@ -88,7 +88,7 @@ pub async fn query3() -> Result<()> {
 
     let ctx = SessionContext::new();
     let df = ctx.read_batch(batch)?;
-    // how to use Vec<RecordBatch> as table
+    // how to register Vec<RecordBatch> as table
     let schema = df.clone().schema().as_arrow().clone();
     let batches = df.collect().await?;
     let mem_table = MemTable::try_new(Arc::new(schema), vec![batches])?;

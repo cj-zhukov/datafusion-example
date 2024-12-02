@@ -6,6 +6,7 @@ use datafusion::arrow::compute::concat;
 use datafusion::arrow::array::{Array, ArrayRef, BinaryArray, BooleanArray, Float32Array, Float64Array, GenericByteArray, Int32Array, Int64Array, PrimitiveArray, StringArray, StructArray};
 use datafusion::arrow::datatypes::{ArrowPrimitiveType, ByteArrayType, DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::datasource::MemTable;
 use datafusion::prelude::*;
 use parquet::arrow::{AsyncArrowWriter, ParquetRecordBatchStreamBuilder};
 use serde_json::{Map, Value};
@@ -544,6 +545,16 @@ pub async fn write_df_to_file(df: DataFrame, file_path: &str) -> Result<()> {
     writer.close().await?;
     let mut file = File::create(file_path).await?;
     file.write_all(&buf).await?;
+
+    Ok(())
+}
+
+/// Register dataframe as table to query later
+pub async fn df_to_table(ctx: SessionContext, df: DataFrame, table_name: &str) -> Result<()> {
+    let schema = df.clone().schema().as_arrow().clone();
+    let batches = df.collect().await?;
+    let mem_table = MemTable::try_new(Arc::new(schema), vec![batches])?;
+    ctx.register_table(table_name, Arc::new(mem_table))?;
 
     Ok(())
 }

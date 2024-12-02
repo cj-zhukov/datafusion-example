@@ -609,3 +609,38 @@ async fn test_is_empty() {
     let df = ctx.read_batch(batch).unwrap();
     assert_eq!(is_empty(df).await.unwrap(), true);
 }
+
+#[tokio::test]
+async fn test_df_to_table() {
+    let schema = Schema::new(vec![
+        Field::new("id", DataType::Int32, false),
+        Field::new("data", DataType::Int32, true),
+        Field::new("name", DataType::Utf8, true),
+
+    ]);
+    let batch = RecordBatch::try_new(
+        schema.clone().into(),
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])),
+            Arc::new(Int32Array::from(vec![42, 43, 44])),
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+        ],
+    ).unwrap();
+
+    let ctx = SessionContext::new();
+    let df = ctx.read_batch(batch).unwrap();
+    df_to_table(ctx.clone(), df, "t").await.unwrap();
+    let res = ctx.sql("select * from t order by id").await.unwrap();
+    assert_batches_eq!(
+        &[
+            "+----+------+------+",
+            "| id | data | name |",
+            "+----+------+------+",
+            "| 1  | 42   | foo  |",
+            "| 2  | 43   | bar  |",
+            "| 3  | 44   | baz  |",
+            "+----+------+------+",
+        ],
+        &res.collect().await.unwrap()
+    );
+}
