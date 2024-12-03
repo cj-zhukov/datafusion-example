@@ -31,7 +31,7 @@ pub async fn round_robin_example() -> Result<()> {
     )?;
     let df = ctx.read_batch(batch.clone())?;
     let table_name = "t";
-    df_to_table(ctx.clone(), df.clone(), table_name).await?;
+    df_to_table(ctx.clone(), df, table_name).await?;
 
     let mut cur_worker = 1;
     while cur_worker <= 5 {
