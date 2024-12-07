@@ -1,9 +1,10 @@
 use std::{str::FromStr, sync::Arc};
 
-use anyhow::Result;
 use datafusion::arrow::array::{Array, ArrayRef, BooleanArray, Int32Array, PrimitiveArray, StringArray};
 use datafusion::arrow::datatypes::{ArrowPrimitiveType, DataType, Int32Type, UInt32Type};
 use datafusion::scalar::ScalarValue;
+
+use crate::error::UtilsError;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ScalarValueNew {
@@ -57,7 +58,7 @@ where
 }
 
 impl ScalarValueNew {
-    pub fn try_from_array(array: &ArrayRef, index: usize) -> Result<Self> {
+    pub fn try_from_array(array: &ArrayRef, index: usize) -> Result<Self, UtilsError> {
         Ok(match array.data_type() {
             DataType::Boolean => typed_cast!(array, index, BooleanArray, Boolean),
             DataType::Int32 => typed_cast!(array, index, Int32Array, Int32),

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::Result;
+use color_eyre::Result;
 use datafusion::arrow::array::{ArrayRef, BooleanArray, Int32Array, ListArray, RecordBatch, StringArray, StructArray};
 use datafusion::arrow::datatypes::{DataType, Field, Fields, Int32Type, Schema};
 use datafusion::prelude::*;

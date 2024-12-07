@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use anyhow::Result;
+use color_eyre::Result;
 use datafusion::arrow::array::{ArrayRef, Int32Array, RecordBatch, StringArray, StructArray};
 use datafusion::arrow::datatypes::{DataType, Field, Fields, Schema};
 use datafusion::prelude::*;

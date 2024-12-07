@@ -1,7 +1,6 @@
 use std::io::Cursor;
 use std::sync::Arc;
 
-// use anyhow::Result;
 use datafusion::arrow::compute::concat;
 use datafusion::arrow::array::{Array, ArrayRef, BinaryArray, BooleanArray, Float32Array, Float64Array, GenericByteArray, Int32Array, Int64Array, PrimitiveArray, StringArray, StructArray};
 use datafusion::arrow::datatypes::{ArrowPrimitiveType, ByteArrayType, DataType, Field, Schema};
@@ -110,7 +109,7 @@ pub async fn is_empty(df: DataFrame) -> Result<bool, UtilsError> {
 /// # Examples
 /// ```
 /// use datafusion::prelude::*;
-/// # use anyhow::Result;
+/// # use color_eyre::Result;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
 /// # use datafusion_example::{df, utils::utils::add_pk_to_df};
 /// # #[tokio::main]
@@ -217,7 +216,7 @@ where
 /// # Examples
 /// ```
 /// use std::sync::Arc;
-/// # use anyhow::Result;
+/// # use color_eyre::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
 /// # use datafusion_example::{df, utils::utils::add_col_to_df};
@@ -253,7 +252,7 @@ pub async fn add_col_to_df(ctx: SessionContext, df: DataFrame, data: ArrayRef, c
 /// Add column to existing dataframe 
 /// # Examples
 /// ```
-/// # use anyhow::Result;
+/// # use color_eyre::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
 /// # use datafusion_example::{df, utils::utils::add_col_arr_to_df};
@@ -405,7 +404,7 @@ pub async fn concat_dfs(ctx: SessionContext, dfs: Vec<DataFrame>) -> Result<Data
 /// Create json like string column new_col from cols
 /// # Examples
 /// ```
-/// # use anyhow::Result;
+/// # use color_eyre::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
 /// # use datafusion_example::{df, utils::utils::df_cols_to_json};
@@ -475,7 +474,7 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
 /// Create nested struct column new_col from cols
 /// # Examples
 /// ```
-/// # use anyhow::Result;
+/// # use color_eyre::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
 /// # use datafusion_example::{df, utils::utils::df_cols_to_struct};

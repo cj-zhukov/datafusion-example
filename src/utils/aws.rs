@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use std::io::Cursor;
 
-use anyhow::{Result, Context};
 use aws_config::{BehaviorVersion, Region, retry::RetryConfig};
 use aws_sdk_s3::operation::get_object::GetObjectOutput;
 use awscreds::Credentials;
@@ -10,6 +9,7 @@ use aws_sdk_s3::config::Builder;
 use aws_sdk_s3::operation::create_multipart_upload::CreateMultipartUploadOutput;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
+use color_eyre::eyre::ContextCompat;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::datatypes::Schema;
 use datafusion::dataframe::DataFrameWriteOptions;
@@ -19,6 +19,8 @@ use object_store::aws::AmazonS3Builder;
 use parquet::arrow::{AsyncArrowWriter, ParquetRecordBatchStreamBuilder};
 use tokio_stream::StreamExt;
 use url::Url;
+
+use crate::error::UtilsError;
 
 const AWS_MAX_RETRIES: u32 = 10;
 
@@ -39,7 +41,7 @@ pub async fn get_aws_client(region: &str) -> Client {
 }
 
 /// Get aws GetObjectOutput
-pub async fn get_aws_object(client: Client, bucket: &str, key: &str) -> Result<GetObjectOutput> {
+pub async fn get_aws_object(client: Client, bucket: &str, key: &str) -> Result<GetObjectOutput, UtilsError> {
     let req = client
         .get_object()
         .bucket(bucket)
@@ -51,7 +53,7 @@ pub async fn get_aws_object(client: Client, bucket: &str, key: &str) -> Result<G
 }
 
 /// Read file from aws s3 
-pub async fn read_file(client: Client, bucket: &str, key: &str) -> Result<Vec<u8>> {
+pub async fn read_file(client: Client, bucket: &str, key: &str) -> Result<Vec<u8>, UtilsError> {
     let mut buf = Vec::new();
     let mut object = get_aws_object(client, bucket, key).await?;
     while let Some(bytes) = object.body.try_next().await? {
@@ -62,7 +64,7 @@ pub async fn read_file(client: Client, bucket: &str, key: &str) -> Result<Vec<u8
 }
 
 /// Read parquet file to dataframe
-pub async fn read_file_to_df(client: Client, ctx: SessionContext, bucket: &str, key: &str) -> Result<DataFrame> {
+pub async fn read_file_to_df(client: Client, ctx: SessionContext, bucket: &str, key: &str) -> Result<DataFrame, UtilsError> {
     let buf = read_file(client, bucket, key).await?;
     let stream = ParquetRecordBatchStreamBuilder::new(Cursor::new(buf))
         .await?
@@ -74,7 +76,7 @@ pub async fn read_file_to_df(client: Client, ctx: SessionContext, bucket: &str, 
 }
 
 /// Read parquet file or dir from AWS S3 into dataframe
-pub async fn read_from_s3(ctx: SessionContext, region: &str, bucket: &str, key: &str) -> Result<DataFrame> {
+pub async fn read_from_s3(ctx: SessionContext, region: &str, bucket: &str, key: &str) -> Result<DataFrame, UtilsError> {
     let creds = Credentials::default()?;
     let aws_access_key_id = creds.access_key.unwrap_or_default();
     let aws_secret_access_key = creds.secret_key.unwrap_or_default();
@@ -89,17 +91,17 @@ pub async fn read_from_s3(ctx: SessionContext, region: &str, bucket: &str, key: 
         .build()?;
 
     let path = format!("s3://{bucket}");
-    let s3_url = Url::parse(&path).context("failed parse")?;
+    let s3_url = Url::parse(&path)?;
     ctx.runtime_env().register_object_store(&s3_url, Arc::new(s3));
 
     let path = format!("s3://{bucket}/{key}");
-    ctx.register_parquet("t", &path, ParquetReadOptions::default()).await.context("failed register parquet")?;
+    ctx.register_parquet("t", &path, ParquetReadOptions::default()).await?;
     let res = ctx.sql("select * from t").await?;
 
     Ok(res)
 }
 
-pub async fn write_to_s3(ctx: SessionContext, bucket: &str, region: &str, key: &str, df: DataFrame) -> Result<()> {
+pub async fn write_to_s3(ctx: SessionContext, bucket: &str, region: &str, key: &str, df: DataFrame) -> Result<(), UtilsError> {
     let creds = Credentials::default()?;
     let aws_access_key_id = creds.access_key.unwrap();
     let aws_secret_access_key = creds.secret_key.unwrap();
@@ -127,31 +129,32 @@ pub async fn write_to_s3(ctx: SessionContext, bucket: &str, region: &str, key: &
     let batches = df.collect().await?;
     let df = ctx.read_batches(batches)?;
     let out_path = format!("s3://{bucket}/{key}");
-    df.write_parquet(&out_path, DataFrameWriteOptions::new(), None).await.context("could not write to s3")?;
+    df.write_parquet(&out_path, DataFrameWriteOptions::new(), None).await?;
 
     Ok(())
 }
 
 /// Write dataframe to aws s3 by chunk
-pub async fn write_df_to_s3(client: Client, bucket: &str, key: &str, df: DataFrame) -> Result<()> {
+pub async fn write_df_to_s3(client: Client, bucket: &str, key: &str, df: DataFrame) -> Result<(), UtilsError> {
     let mut buf = vec![];
     let schema = Schema::from(df.clone().schema());
-    let mut stream = df.execute_stream().await.context("could not create stream from df")?;
-    let mut writer = AsyncArrowWriter::try_new(&mut buf, schema.into(), None).context("could not create writer")?;
+    let mut stream = df.execute_stream().await?;
+    let mut writer = AsyncArrowWriter::try_new(&mut buf, schema.into(), None)?;
     while let Some(batch) = stream.next().await.transpose()? {
-        writer.write(&batch).await.context("could not write to writer")?;
+        writer.write(&batch).await?;
     }
-    writer.close().await.context("could not close writer")?;
+    writer.close().await?;
 
     let multipart_upload_res: CreateMultipartUploadOutput = client
         .create_multipart_upload()
         .bucket(bucket)
         .key(key)
         .send()
-        .await
-        .context(format!("could not create multipart upload bucket: {} key: {}", bucket, key))?;
+        .await?;
 
-    let upload_id = multipart_upload_res.upload_id().context(format!("could not get upload_id for key: {}", key))?;
+    let upload_id = multipart_upload_res.upload_id()
+        .wrap_err(format!("failed get upload_id for key: {}", key))
+        .map_err(|e| UtilsError::UnexpectedError(e))?;
     let mut upload_parts: Vec<CompletedPart> = Vec::new();
     let mut stream = ByteStream::from(buf);
     let mut part_number = 1;
@@ -165,8 +168,7 @@ pub async fn write_df_to_s3(client: Client, bucket: &str, key: &str, df: DataFra
             .body(ByteStream::from(bytes))
             .part_number(part_number)
             .send()
-            .await
-            .context(format!("could not create upload part for key: {}", key))?;
+            .await?;
     
         upload_parts.push(
             CompletedPart::builder()
@@ -189,31 +191,31 @@ pub async fn write_df_to_s3(client: Client, bucket: &str, key: &str, df: DataFra
         .multipart_upload(completed_multipart_upload)
         .upload_id(upload_id)
         .send()
-        .await
-        .context(format!("could not complete multipart upload for key: {}", key))?;
+        .await?;
 
     Ok(())
 }
 
 /// Write dataframe's record batches
-pub async fn write_batches_to_s3(client: Client, bucket: &str, key: &str, batches: Vec<RecordBatch>) -> Result<()> {
+pub async fn write_batches_to_s3(client: Client, bucket: &str, key: &str, batches: Vec<RecordBatch>) -> Result<(), UtilsError> {
     let mut buf = vec![];
     let schema = batches[0].schema();
-    let mut writer = AsyncArrowWriter::try_new(&mut buf, schema, None).context("could not create writer")?;
+    let mut writer = AsyncArrowWriter::try_new(&mut buf, schema, None)?;
     for batch in batches {
-        writer.write(&batch).await.context("could not write to writer")?;
+        writer.write(&batch).await?;
     }
-    writer.close().await.context("could not close writer")?;
+    writer.close().await?;
 
     let multipart_upload_res: CreateMultipartUploadOutput = client
         .create_multipart_upload()
         .bucket(bucket)
         .key(key)
         .send()
-        .await
-        .context(format!("could not create multipart upload bucket: {} key: {}", bucket, key))?;
+        .await?;
 
-    let upload_id = multipart_upload_res.upload_id().context(format!("could not get upload_id for key: {}", key))?;
+    let upload_id = multipart_upload_res.upload_id()
+        .wrap_err(format!("failed get upload_id for key: {}", key))
+        .map_err(|e| UtilsError::UnexpectedError(e))?;
     let mut upload_parts: Vec<CompletedPart> = Vec::new();
     let mut stream = ByteStream::from(buf);
     let mut part_number = 1;
@@ -227,8 +229,7 @@ pub async fn write_batches_to_s3(client: Client, bucket: &str, key: &str, batche
             .body(ByteStream::from(bytes))
             .part_number(part_number)
             .send()
-            .await
-            .context(format!("could not create upload part for key: {}", key))?;
+            .await?;
     
         upload_parts.push(
             CompletedPart::builder()
@@ -251,8 +252,7 @@ pub async fn write_batches_to_s3(client: Client, bucket: &str, key: &str, batche
         .multipart_upload(completed_multipart_upload)
         .upload_id(upload_id)
         .send()
-        .await
-        .context(format!("could not complete multipart upload for key: {}", key))?;
+        .await?;
 
     Ok(())
 }

@@ -11,7 +11,6 @@ datafusion = { version = "43", features = ["default"] }
 arrow-json = "53"
 parquet = "53"
 object_store = { version = "0.11", features = ["aws", "cloud"] }
-anyhow = "1"
 thiserror = "2"
 color-eyre = "0.6"
 serde = { version = "1.0", features = ["derive"] }
@@ -20,6 +19,7 @@ itertools = "0.13"
 aws-config = "1"
 aws-sdk-s3 = "1"
 aws-creds = "0.37"
+aws-smithy-types = "1"
 url = "2"
 chrono = "0.4.38"
 time = "0.3.36"
