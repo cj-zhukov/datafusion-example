@@ -471,7 +471,8 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
     Ok(res)
 }
 
-/// Create nested struct column new_col from cols
+/// Create nested struct column new_col from cols.
+/// Can de done using struct in query: ctx.sql("select id, struct(name as name, data as data) as new_col from t").await?;
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
@@ -492,6 +493,7 @@ pub async fn df_cols_to_json(ctx: SessionContext, df: DataFrame, cols: &[&str], 
 /// // | 3  | baz  | 44   |
 /// // +----+------+------+
 /// let ctx = SessionContext::new();
+/// // 
 /// let res = df_cols_to_struct(ctx, df, &["name", "data"], Some("new_col")).await;
 /// // +----+-----------------------+
 /// // | id | new_col               |

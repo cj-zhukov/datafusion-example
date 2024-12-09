@@ -7,6 +7,7 @@ use datafusion::arrow::compute::concat;
 use datafusion::{arrow, assert_batches_eq, prelude::*};
 use datafusion::scalar::ScalarValue;
 use datafusion_example::utils::scalarvalue::parse_strings;
+use datafusion_example::utils::utils::df_to_table;
 use tokio_stream::StreamExt;
 
 #[tokio::main]
@@ -15,7 +16,8 @@ async fn main() -> Result<()> {
     join_sql().await?;
     add_literal_col().await?;
     add_str_col().await?;
-    assert1().await?;
+    df_cols_to_struct().await?;
+    assert1().await?;   
     assert2().await?;
     downcast_df().await?;
     downcast_df2();
@@ -164,6 +166,32 @@ pub async fn add_str_col() -> Result<()> {
     let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_new_col])?;
     let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
     let res = ctx.read_batch(batch)?;
+
+    res.show().await?;
+
+    Ok(())
+}
+
+pub async fn df_cols_to_struct() -> Result<()> {
+    let schema = Arc::new(Schema::new(vec![
+        Field::new("id", DataType::Int32, false),
+        Field::new("name", DataType::Utf8, false),
+        Field::new("data", DataType::Int32, false),
+    ]));
+
+    let batch = RecordBatch::try_new(
+        schema,
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])),
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+            Arc::new(Int32Array::from(vec![42, 43, 44])),
+        ],
+    )?;
+
+    let ctx = SessionContext::new();
+    let df = ctx.read_batch(batch)?;
+    df_to_table(ctx.clone(), df, "t").await?;
+    let res = ctx.sql("select id, struct(name as name, data as data) as new_col from t").await?;
 
     res.show().await?;
 
