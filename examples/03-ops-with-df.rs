@@ -17,6 +17,7 @@ async fn main() -> Result<()> {
     add_literal_col().await?;
     add_str_col().await?;
     df_cols_to_struct().await?;
+    update_col_df().await?;
     assert1().await?;   
     assert2().await?;
     downcast_df().await?;
@@ -193,6 +194,38 @@ pub async fn df_cols_to_struct() -> Result<()> {
     df_to_table(ctx.clone(), df, "t").await?;
     let res = ctx.sql("select id, struct(name as name, data as data) as new_col from t").await?;
 
+    res.show().await?;
+
+    Ok(())
+}
+
+pub async fn update_col_df() -> Result<()> {
+    let schema = Schema::new(vec![
+        Field::new("id", DataType::Int32, false),
+        Field::new("data", DataType::Int32, true),
+    ]);
+    let batch = RecordBatch::try_new(
+        schema.clone().into(),
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])),
+            Arc::new(Int32Array::from(vec![42, 43, 44])),
+        ],
+    )?;
+    let ctx = SessionContext::new();
+    ctx.register_batch("t", batch)?;
+
+    // SQL Query to increment the "id" column
+    let res = ctx.sql("select id + 1 as id, data from t").await?;
+    res.show().await?;
+
+    // Using DataFrame API to increment the column
+    let res = ctx   
+        .table("t")
+        .await?
+        .select(vec![
+            (col("id") + lit(1)).alias("id"),
+            col("data")
+        ])?;
     res.show().await?;
 
     Ok(())
