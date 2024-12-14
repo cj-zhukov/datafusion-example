@@ -17,7 +17,8 @@ async fn main() -> Result<()> {
     add_literal_col().await?;
     add_str_col().await?;
     df_cols_to_struct().await?;
-    update_col_df().await?;
+    update_col_df1().await?;
+    update_col_df2().await?;
     assert1().await?;   
     assert2().await?;
     downcast_df().await?;
@@ -199,7 +200,7 @@ pub async fn df_cols_to_struct() -> Result<()> {
     Ok(())
 }
 
-pub async fn update_col_df() -> Result<()> {
+pub async fn update_col_df1() -> Result<()> {
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
         Field::new("data", DataType::Int32, true),
@@ -226,6 +227,37 @@ pub async fn update_col_df() -> Result<()> {
             (col("id") + lit(1)).alias("id"),
             col("data")
         ])?;
+    res.show().await?;
+
+    Ok(())
+}
+
+pub async fn update_col_df2() -> Result<()> {
+    let schema = Schema::new(vec![
+        Field::new("id", DataType::Int32, false),
+        Field::new("data", DataType::Int32, true),
+    ]);
+    let batch = RecordBatch::try_new(
+        schema.clone().into(),
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])),
+            Arc::new(Int32Array::from(vec![42, 43, 44])),
+        ],
+    )?;
+    let ctx = SessionContext::new();
+    ctx.register_batch("t", batch)?;
+    
+    // update table by some createria
+    let res = ctx.sql(
+        "select 
+            id,
+            case 
+                when id = 1 then data * data
+                else data
+            end AS data
+        from t"
+    ).await?;
+
     res.show().await?;
 
     Ok(())
