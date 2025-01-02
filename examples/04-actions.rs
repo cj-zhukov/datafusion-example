@@ -14,7 +14,7 @@ use tokio_stream::StreamExt;
 async fn main() -> Result<()> {
     demo_struct().await?;
     record_batches_to_json_rows()?;
-    df_cols_to_json_example().await?;
+    // df_cols_to_json_example().await?; // #TODO schema error
     df_cols_to_struct_example().await?;
     scalar_new_example().await?;
 
