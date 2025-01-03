@@ -33,7 +33,7 @@ pub async fn round_robin_example() -> Result<()> {
     )?;
     let df = ctx.read_batch(batch.clone())?;
     let table_name = "t";
-    df_to_table(ctx.clone(), df, table_name).await?;
+    df_to_table(&ctx, df, table_name).await?;
 
     let mut cur_worker = 1;
     while cur_worker <= 5 {
@@ -63,7 +63,7 @@ pub async fn random_example() -> Result<()> {
     )?;
     let df = ctx.read_batch(batch.clone())?;
     let table_name = "t";
-    df_to_table(ctx.clone(), df, table_name).await?;
+    df_to_table(&ctx, df, table_name).await?;
 
     let sql = format!("select *
                                 from {table_name} 
@@ -97,7 +97,7 @@ pub async fn least_values_example() -> Result<()> {
     let df = ctx.read_batch(batch.clone())?;
     let table_name = "t";
     let col_val = "id";
-    df_to_table(ctx.clone(), df, table_name).await?;
+    df_to_table(&ctx, df, table_name).await?;
 
     let sql = format!("select *
                                 from {table_name} 

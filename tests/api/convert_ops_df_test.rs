@@ -79,7 +79,7 @@ async fn test_cols_to_json() {
 
     let ctx = SessionContext::new();
     let df = ctx.read_batch(batch).unwrap();
-    let res = df_cols_to_json(ctx, df, &["name", "data"], Some("metadata")).await.unwrap();
+    let res = df_cols_to_json(&ctx, df, &["name", "data"], Some("metadata")).await.unwrap();
 
     assert_eq!(res.schema().fields().len(), 2); // columns count
     assert_eq!(res.clone().count().await.unwrap(), 3); // rows count
@@ -117,7 +117,7 @@ async fn test_cols_to_struct() {
 
     let ctx = SessionContext::new();
     let df = ctx.read_batch(batch).unwrap();
-    let res = df_cols_to_struct(ctx, df, &["name", "data"], Some("metadata")).await.unwrap();
+    let res = df_cols_to_struct(&ctx, df, &["name", "data"], Some("metadata")).await.unwrap();
 
     assert_eq!(res.schema().fields().len(), 2); // columns count
     assert_eq!(res.clone().count().await.unwrap(), 3); // rows count
@@ -156,7 +156,7 @@ async fn test_add_pk_to_df() {
     let ctx = SessionContext::new();
     let df = ctx.read_batch(batch).unwrap();
 
-    let res = add_pk_to_df(ctx, df, "pk").await.unwrap();
+    let res = add_pk_to_df(&ctx, df, "pk").await.unwrap();
 
     assert_eq!(res.schema().fields().len(), 4); // columns count
     assert_eq!(res.clone().count().await.unwrap(), 3); // rows count
@@ -196,7 +196,7 @@ async fn test_concat_dfs() {
     let df1 = ctx.read_batch(batch).unwrap();
     let df2 = df1.clone();
 
-    let res = concat_dfs(ctx, vec![df1, df2]).await.unwrap();
+    let res = concat_dfs(&ctx, vec![df1, df2]).await.unwrap();
 
     assert_eq!(res.schema().fields().len(), 3); // columns count
     assert_eq!(res.clone().count().await.unwrap(), 6); // rows count
@@ -237,7 +237,7 @@ async fn test_add_int_col_to_df() {
     let df = ctx.read_batch(batch).unwrap();
 
     let data = vec![42, 43, 44];
-    let res = add_int_col_to_df(ctx, df, data, "data").await.unwrap();
+    let res = add_int_col_to_df(&ctx, df, data, "data").await.unwrap();
 
     assert_eq!(res.schema().fields().len(), 3); // columns count
     assert_eq!(res.clone().count().await.unwrap(), 3); // rows count
@@ -275,7 +275,7 @@ async fn test_add_str_col_to_df() {
     let df = ctx.read_batch(batch).unwrap();
 
     let data = vec!["foo", "bar", "baz"];
-    let res = add_str_col_to_df(ctx, df, data, "name").await.unwrap();
+    let res = add_str_col_to_df(&ctx, df, data, "name").await.unwrap();
 
     assert_eq!(res.schema().fields().len(), 3); // columns count
     assert_eq!(res.clone().count().await.unwrap(), 3); // rows count
@@ -314,11 +314,11 @@ async fn test_add_any_num_col_to_df() {
 
     let data = vec![1, 2, 3];
     let data_col = Int32Array::from(data);
-    let df = add_any_num_col_to_df(ctx.clone(), df, data_col, "col1").await.unwrap();
+    let df = add_any_num_col_to_df(&ctx, df, data_col, "col1").await.unwrap();
 
     let data = vec![1.1, 1.2, 1.3];
     let data_col = Float64Array::from(data);
-    let res = add_any_num_col_to_df(ctx, df, data_col, "col2").await.unwrap();
+    let res = add_any_num_col_to_df(&ctx, df, data_col, "col2").await.unwrap();
 
     assert_eq!(res.schema().fields().len(), 4); // columns count
     assert_eq!(res.clone().count().await.unwrap(), 3); // rows count
@@ -357,11 +357,11 @@ async fn test_add_any_str_col_to_df() {
 
     let data = vec!["foo", "bar", "baz"];
     let data_col = StringArray::from(data);
-    let df = add_any_str_col_to_df(ctx.clone(), df, data_col, "col1").await.unwrap();
+    let df = add_any_str_col_to_df(&ctx, df, data_col, "col1").await.unwrap();
 
     let data = vec!["foo", "bar", "baz"];
     let data_col = LargeStringArray::from(data);
-    let res = add_any_str_col_to_df(ctx, df, data_col, "col2").await.unwrap();
+    let res = add_any_str_col_to_df(&ctx, df, data_col, "col2").await.unwrap();
 
     assert_eq!(res.schema().fields().len(), 4); // columns count
     assert_eq!(res.clone().count().await.unwrap(), 3); // rows count
@@ -400,8 +400,8 @@ async fn test_add_col_to_df() {
 
     let col1 = Arc::new(StringArray::from(vec!["foo", "bar", "baz"]));
     let col2 = Arc::new(Float64Array::from(vec![42.0, 43.0, 44.0]));
-    let df = add_col_to_df(ctx.clone(), df, col1, "col1").await.unwrap();
-    let res = add_col_to_df(ctx, df, col2, "col2").await.unwrap();
+    let df = add_col_to_df(&ctx, df, col1, "col1").await.unwrap();
+    let res = add_col_to_df(&ctx, df, col2, "col2").await.unwrap();
     
     let rows = res.sort(vec![col("id").sort(true, true)]).unwrap();
     assert_batches_eq!(
@@ -437,8 +437,8 @@ async fn test_add_col_arr_to_df() {
 
     let col1 = StringArray::from(vec!["foo", "bar", "baz"]);
     let col2 = Float64Array::from(vec![42.0, 43.0, 44.0]);
-    let df = add_col_arr_to_df(ctx.clone(), df, &col1, "col1").await.unwrap();
-    let res = add_col_arr_to_df(ctx, df, &col2, "col2").await.unwrap();
+    let df = add_col_arr_to_df(&ctx, df, &col1, "col1").await.unwrap();
+    let res = add_col_arr_to_df(&ctx, df, &col2, "col2").await.unwrap();
     
     let rows = res.sort(vec![col("id").sort(true, true)]).unwrap();
     assert_batches_eq!(

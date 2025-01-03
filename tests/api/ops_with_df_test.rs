@@ -119,7 +119,7 @@ async fn test_df_to_table() {
 
     let ctx = SessionContext::new();
     let df = ctx.read_batch(batch).unwrap();
-    df_to_table(ctx.clone(), df, "t").await.unwrap();
+    df_to_table(&ctx, df, "t").await.unwrap();
     let res = ctx.sql("select * from t order by id").await.unwrap();
     assert_batches_eq!(
         &[

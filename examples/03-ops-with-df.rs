@@ -192,7 +192,7 @@ pub async fn df_cols_to_struct() -> Result<()> {
 
     let ctx = SessionContext::new();
     let df = ctx.read_batch(batch)?;
-    df_to_table(ctx.clone(), df, "t").await?;
+    df_to_table(&ctx, df, "t").await?;
     let res = ctx.sql("select id, struct(name as name, data as data) as new_col from t").await?;
 
     res.show().await?;
