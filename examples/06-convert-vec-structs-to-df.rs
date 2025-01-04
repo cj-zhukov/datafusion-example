@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use arrow_json::ReaderBuilder;
 use color_eyre::Result;
+use datafusion::arrow::array::{Int32Array, RecordBatch, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::prelude::*;
 use serde::Serialize;
@@ -22,14 +23,29 @@ impl Foo {
 }
 
 impl Foo {
-    // #TODO 
     async fn to_df(ctx: &SessionContext, records: &Vec<Self>) -> Result<DataFrame> {
-        todo!()
+        let mut ids = vec![];
+        let mut names = vec![];
+
+        for record in records {
+            ids.push(record.id);
+            names.push(record.name.as_ref());
+        }
+
+        let batch = RecordBatch::try_new(
+            Arc::new(Foo::schema()),
+            vec![
+                Arc::new(Int32Array::from(ids)),
+                Arc::new(StringArray::from(names)),
+            ],
+        )?;
+
+        let df = ctx.read_batch(batch)?;
+        Ok(df)
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn get_foos() -> Vec<Foo> {
     let mut records = vec![];
     let rec1 = Foo { id: 42, name: "foo".to_string() };
     let rec2 = Foo { id: 43, name: "bar".to_string() };
@@ -37,13 +53,31 @@ async fn main() -> Result<()> {
     records.push(rec1);
     records.push(rec2);
     records.push(rec3);
+    records
+}
 
+#[tokio::main]
+async fn main() -> Result<()> {
+    let records = get_foos();
+    let ctx = SessionContext::new();
+
+    convert_vec_structs_to_df1(&ctx, &records).await?;
+    convert_vec_structs_to_df2(&ctx, &records).await?;
+    Ok(())
+}
+
+async fn convert_vec_structs_to_df1(ctx: &SessionContext, records: &Vec<Foo>) -> Result<()> {
     let schema = Foo::schema();
     let mut decoder = ReaderBuilder::new(Arc::new(schema)).build_decoder()?;
-    decoder.serialize(&records)?;
+    decoder.serialize(records)?;
     let batch = decoder.flush()?.unwrap();
-    let ctx = SessionContext::new();
     let df = ctx.read_batch(batch)?;
+    df.show().await?;
+    Ok(())
+}
+
+async fn convert_vec_structs_to_df2(ctx: &SessionContext, records: &Vec<Foo>) -> Result<()> {
+    let df = Foo::to_df(ctx, records).await?;
     df.show().await?;
     Ok(())
 }
