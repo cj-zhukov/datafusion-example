@@ -11,7 +11,6 @@ async fn main() -> Result<()> {
     round_robin_example().await?;
     random_example().await?;
     least_values_example().await?;
-
     Ok(())
 }
 

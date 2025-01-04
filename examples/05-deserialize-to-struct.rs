@@ -60,7 +60,5 @@ impl Foo {
 #[tokio::main]
 async fn main() -> Result<()> {
     Foo::new().await?;
-
     Ok(())
 }
-

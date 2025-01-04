@@ -21,6 +21,12 @@ impl Foo {
     }
 }
 
+impl Foo {
+    // #TODO 
+    async fn to_df(ctx: &SessionContext, records: &Vec<Self>) -> Result<DataFrame> {
+        todo!()
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -39,6 +45,5 @@ async fn main() -> Result<()> {
     let ctx = SessionContext::new();
     let df = ctx.read_batch(batch)?;
     df.show().await?;
-
     Ok(())
 }
