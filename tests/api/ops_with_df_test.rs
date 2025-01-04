@@ -12,7 +12,7 @@ use datafusion_example::df;
 async fn test_df_macro() {
     let id = Int32Array::from(vec![1, 2, 3]);
     let data = Int32Array::from(vec![42, 43, 44]);
-    let name = StringArray::from(vec!["foo", "bar", "baz"]);
+    let name = StringArray::from(vec![Some("foo"), Some("bar"), None]);
 
     let df = df!(
         "id" => id,
@@ -31,7 +31,7 @@ async fn test_df_macro() {
             "+----+------+------+",
             "| 1  | 42   | foo  |",
             "| 2  | 43   | bar  |",
-            "| 3  | 44   | baz  |",
+            "| 3  | 44   |      |",
             "+----+------+------+",
         ],
         &rows.collect().await.unwrap()

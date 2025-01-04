@@ -79,7 +79,7 @@ async fn test_cols_to_json() {
 
     let ctx = SessionContext::new();
     let df = ctx.read_batch(batch).unwrap();
-    let res = df_cols_to_json(&ctx, df, &["name", "data"], Some("metadata")).await.unwrap();
+    let res = df_cols_to_json(&ctx, df, &["name", "data"], "metadata").await.unwrap();
 
     assert_eq!(res.schema().fields().len(), 2); // columns count
     assert_eq!(res.clone().count().await.unwrap(), 3); // rows count
@@ -117,7 +117,7 @@ async fn test_cols_to_struct() {
 
     let ctx = SessionContext::new();
     let df = ctx.read_batch(batch).unwrap();
-    let res = df_cols_to_struct(&ctx, df, &["name", "data"], Some("metadata")).await.unwrap();
+    let res = df_cols_to_struct(&ctx, df, &["name", "data"], "metadata").await.unwrap();
 
     assert_eq!(res.schema().fields().len(), 2); // columns count
     assert_eq!(res.clone().count().await.unwrap(), 3); // rows count

@@ -93,7 +93,6 @@ macro_rules! df {
 pub async fn df_sql(df: DataFrame, sql: &str) -> Result<DataFrame, UtilsError> {
     let filter = df.parse_sql_expr(sql)?;
     let res = df.filter(filter)?;
-
     Ok(res)
 }
 
@@ -136,73 +135,82 @@ pub async fn is_empty(df: DataFrame) -> Result<bool, UtilsError> {
 /// # }
 /// ```
 pub async fn add_pk_to_df(ctx: &SessionContext, df: DataFrame, col_name: &str) -> Result<DataFrame, UtilsError> {
-    let schema = df.schema().clone();
+    let schema = df.schema().as_arrow().clone();
     let mut arrays = concat_arrays(df).await?;    
     let max_len = arrays.first().unwrap().len();
     let pks: ArrayRef = Arc::new(Int32Array::from_iter(0..max_len as i32));
     arrays.push(pks);
     let schema_pks = Schema::new(vec![Field::new(col_name, DataType::Int32, true)]);
-    let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_pks])?;
-    let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
+    let schema_new = Schema::try_merge(vec![schema, schema_pks])?;
+    let batch = RecordBatch::try_new(Arc::new(schema_new), arrays)?;
     let res = ctx.read_batch(batch)?;
-
     Ok(res)
 }
 
 /// Add int32 column to existing dataframe
 pub async fn add_int_col_to_df(ctx: &SessionContext, df: DataFrame, data: Vec<i32>, col_name: &str) -> Result<DataFrame, UtilsError> {
-    let schema = df.schema().clone();
+    let schema = df.schema().as_arrow().clone();
     let mut arrays = concat_arrays(df).await?;  
     let new_col: ArrayRef = Arc::new(Int32Array::from(data));
     arrays.push(new_col);
     let schema_new_col = Schema::new(vec![Field::new(col_name, DataType::Int32, true)]);
-    let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_new_col])?;
-    let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
+    let schema_new = Schema::try_merge(vec![schema, schema_new_col])?;
+    let batch = RecordBatch::try_new(Arc::new(schema_new), arrays)?;
     let res = ctx.read_batch(batch)?;
     Ok(res)
 }
 
 /// Add string column to existing dataframe
 pub async fn add_str_col_to_df(ctx: &SessionContext, df: DataFrame, data: Vec<&str>, col_name: &str) -> Result<DataFrame, UtilsError> {
-    let schema = df.schema().clone();
+    let schema = df.schema().as_arrow().clone();
     let mut arrays = concat_arrays(df).await?;  
     let new_col: ArrayRef = Arc::new(StringArray::from(data));
     arrays.push(new_col);
     let schema_new_col = Schema::new(vec![Field::new(col_name, DataType::Utf8, true)]);
-    let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_new_col])?;
-    let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
+    let schema_new = Schema::try_merge(vec![schema, schema_new_col])?;
+    let batch = RecordBatch::try_new(Arc::new(schema_new), arrays)?;
     let res = ctx.read_batch(batch)?;
     Ok(res)
 }
 
 /// Add any numeric column to existing dataframe 
-pub async fn add_any_num_col_to_df<T>(ctx: &SessionContext, df: DataFrame, data: PrimitiveArray<T>, col_name: &str) -> Result<DataFrame, UtilsError>
+pub async fn add_any_num_col_to_df<T>(
+    ctx: &SessionContext, 
+    df: DataFrame, 
+    data: PrimitiveArray<T>, 
+    col_name: &str,
+) -> Result<DataFrame, UtilsError>
 where 
     T: ArrowPrimitiveType
 {
-    let schema = df.schema().clone();
+    let schema = df.schema().as_arrow().clone();
     let mut arrays = concat_arrays(df).await?;
     let schema_new_col = Schema::new(vec![Field::new(col_name, data.data_type().clone(), true)]);
     let new_col: ArrayRef = Arc::new(data);
     arrays.push(new_col);
-    let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_new_col])?;
-    let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
+    let schema_new = Schema::try_merge(vec![schema, schema_new_col])?;
+    let batch = RecordBatch::try_new(Arc::new(schema_new), arrays)?;
     let res = ctx.read_batch(batch)?;
     Ok(res)
 }
 
 /// Add any string column to existing dataframe 
-pub async fn add_any_str_col_to_df<T>(ctx: &SessionContext, df: DataFrame, data: GenericByteArray<T>, col_name: &str) -> Result<DataFrame, UtilsError> 
+pub async fn add_any_str_col_to_df<T>(
+    ctx: &SessionContext, 
+    df: DataFrame, 
+    data: GenericByteArray<T>, 
+    col_name: &str,
+) -> Result<DataFrame, UtilsError> 
 where 
     T: ByteArrayType
 {
-    let schema = df.schema().clone();
+    let schema = df.schema().as_arrow().clone();
     let mut arrays = concat_arrays(df).await?;
     let schema_new_col = Schema::new(vec![Field::new(col_name, data.data_type().clone(), true)]);
     let new_col: ArrayRef = Arc::new(data);
     arrays.push(new_col);
-    let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_new_col])?;
-    let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
+    let schema_new = Schema::try_merge(vec![schema, schema_new_col])?;
+    let batch = RecordBatch::try_new(Arc::new(schema_new), arrays)?;
     let res = ctx.read_batch(batch)?;
     Ok(res)
 }
@@ -233,12 +241,12 @@ where
 /// # }
 /// ```
 pub async fn add_col_to_df(ctx: &SessionContext, df: DataFrame, data: ArrayRef, col_name: &str) -> Result<DataFrame, UtilsError> {
-    let schema = df.schema().clone();
+    let schema = df.schema().as_arrow().clone();
     let mut arrays = concat_arrays(df).await?;
     let schema_new_col = Schema::new(vec![Field::new(col_name, data.data_type().clone(), true)]);
     arrays.push(data);
-    let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_new_col])?;
-    let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
+    let schema_new = Schema::try_merge(vec![schema, schema_new_col])?;
+    let batch = RecordBatch::try_new(Arc::new(schema_new), arrays)?;
     let res = ctx.read_batch(batch)?;
     Ok(res)
 }
@@ -268,7 +276,7 @@ pub async fn add_col_to_df(ctx: &SessionContext, df: DataFrame, data: ArrayRef, 
 /// # }
 /// ```
 pub async fn add_col_arr_to_df(ctx: &SessionContext, df: DataFrame, data: &dyn Array, col_name: &str) -> Result<DataFrame, UtilsError> {
-    let schema = df.schema().clone();
+    let schema = df.schema().as_arrow().clone();
     let mut arrays = concat_arrays(df).await?;
     let schema_new_col = Schema::new(vec![Field::new(col_name, data.data_type().clone(), true)]);
     
@@ -305,8 +313,8 @@ pub async fn add_col_arr_to_df(ctx: &SessionContext, df: DataFrame, data: &dyn A
     };
 
     arrays.push(array);
-    let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_new_col])?;
-    let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
+    let schema_new = Schema::try_merge(vec![schema, schema_new_col])?;
+    let batch = RecordBatch::try_new(Arc::new(schema_new), arrays)?;
     let res = ctx.read_batch(batch)?;
     Ok(res)
 }
@@ -346,7 +354,6 @@ pub fn select_all_exclude(df: DataFrame, to_exclude: &[&str]) -> Result<DataFram
         .map(|x| x.name().as_str())
         .filter(|x| !to_exclude.iter().any(|col| col.eq(x)))
         .collect::<Vec<_>>();
-    
     let res = df.clone().select_columns(&columns)?;
     Ok(res)
 }
@@ -412,7 +419,7 @@ pub async fn concat_dfs(ctx: &SessionContext, dfs: Vec<DataFrame>) -> Result<Dat
 /// // | 3  | baz  | 44   |
 /// // +----+------+------+
 /// let ctx = SessionContext::new();
-/// let res = df_cols_to_json(&ctx, df, &["name", "data"], Some("new_col")).await?;
+/// let res = df_cols_to_json(&ctx, df, &["name", "data"], "new_col").await?;
 /// // +----+--------------------------+,
 /// // | id | new_col                  |,
 /// // +----+--------------------------+,
@@ -423,10 +430,11 @@ pub async fn concat_dfs(ctx: &SessionContext, dfs: Vec<DataFrame>) -> Result<Dat
 /// # Ok(())
 /// # }
 /// ```
-pub async fn df_cols_to_json(ctx: &SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame, UtilsError> {
-    let schema = df.schema().clone();
+pub async fn df_cols_to_json(ctx: &SessionContext, df: DataFrame, cols: &[&str], new_col: &str) -> Result<DataFrame, UtilsError> {
+    let schema = df.schema().as_arrow().to_owned();
+    let schema_ref = Arc::new(schema);
     let mut arrays = concat_arrays(df).await?;
-    let batch = RecordBatch::try_new(schema.as_arrow().clone().into(), arrays.clone())?;
+    let batch = RecordBatch::try_new(schema_ref.clone(), arrays.clone())?;
     let df_prepared = ctx.read_batch(batch)?;
     let batches = df_prepared.select_columns(cols)?.collect().await?;
     let buf = Vec::new();
@@ -452,9 +460,10 @@ pub async fn df_cols_to_json(ctx: &SessionContext, df: DataFrame, cols: &[&str],
     let new_col_arr: ArrayRef = Arc::new(StringArray::from(str_rows));
     arrays.push(new_col_arr);
 
-    let schema_new_col = Schema::new(vec![Field::new(new_col.unwrap_or("new_col"), DataType::Utf8, true)]);
-    let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), schema_new_col])?;
-    let batch = RecordBatch::try_new(schema_new.into(), arrays)?;
+    let schema_new_col = Schema::new(vec![Field::new(new_col, DataType::Utf8, true)]);
+    let schema = schema_ref.as_ref().clone();
+    let schema_new = Schema::try_merge(vec![schema, schema_new_col])?;
+    let batch = RecordBatch::try_new(Arc::new(schema_new), arrays)?;
     let res = ctx.read_batch(batch)?;
     let res = res.drop_columns(cols)?;
     Ok(res)
@@ -483,7 +492,7 @@ pub async fn df_cols_to_json(ctx: &SessionContext, df: DataFrame, cols: &[&str],
 /// // +----+------+------+
 /// let ctx = SessionContext::new();
 /// // 
-/// let res = df_cols_to_struct(&ctx, df, &["name", "data"], Some("new_col")).await;
+/// let res = df_cols_to_struct(&ctx, df, &["name", "data"], "new_col").await;
 /// // +----+-----------------------+
 /// // | id | new_col               |
 /// // +----+-----------------------+
@@ -494,23 +503,25 @@ pub async fn df_cols_to_json(ctx: &SessionContext, df: DataFrame, cols: &[&str],
 /// # Ok(())
 /// # }
 /// ```
-pub async fn df_cols_to_struct(ctx: &SessionContext, df: DataFrame, cols: &[&str], new_col: Option<&str>) -> Result<DataFrame, UtilsError> {
-    let schema = df.schema().clone();
+pub async fn df_cols_to_struct(ctx: &SessionContext, df: DataFrame, cols: &[&str], new_col: &str) -> Result<DataFrame, UtilsError> {
+    let schema = df.schema().as_arrow().to_owned();
+    let schema_ref = Arc::new(schema);
     let mut arrays = concat_arrays(df).await?;
-    let batch = RecordBatch::try_new(schema.as_arrow().clone().into(), arrays.clone())?;
+    let batch = RecordBatch::try_new(schema_ref.clone(), arrays.clone())?;
     let mut struct_array_data = vec![];
     for col in cols {
-        let field = schema.as_arrow().field_with_name(col)?.clone();
+        let field = schema_ref.field_with_name(col)?.clone();
         let arr = batch.column_by_name(col).unwrap().clone();
         struct_array_data.push((Arc::new(field), arr));
     }
     let df_struct = ctx.read_batch(batch)?.select_columns(cols)?;
     let fields = df_struct.schema().clone().as_arrow().fields().clone();
     let struct_array = StructArray::from(struct_array_data);
-    let struct_array_schema = Schema::new(vec![Field::new(new_col.unwrap_or("new_col"), DataType::Struct(fields), true)]);
-    let schema_new = Schema::try_merge(vec![schema.as_arrow().clone(), struct_array_schema.clone()])?;
+    let struct_array_schema = Schema::new(vec![Field::new(new_col, DataType::Struct(fields), true)]);
+    let schema = schema_ref.as_ref().clone();
+    let schema_new = Schema::try_merge(vec![schema, struct_array_schema])?;
     arrays.push(Arc::new(struct_array));
-    let batch_with_struct = RecordBatch::try_new(schema_new.into(), arrays)?;
+    let batch_with_struct = RecordBatch::try_new(Arc::new(schema_new), arrays)?;
 
     let res = ctx.read_batch(batch_with_struct)?;
     let res = res.drop_columns(cols)?;
@@ -519,6 +530,7 @@ pub async fn df_cols_to_struct(ctx: &SessionContext, df: DataFrame, cols: &[&str
 
 /// Read parquet file to dataframe
 pub async fn read_file_to_df(ctx: &SessionContext, file_path: &str) -> Result<DataFrame, UtilsError> {
+    // #TODO read file by chunk
     let mut buf = vec![];
     let _n = File::open(file_path).await?.read_to_end(&mut buf).await?;
     let stream = ParquetRecordBatchStreamBuilder::new(Cursor::new(buf))
@@ -534,7 +546,7 @@ pub async fn write_df_to_file(df: DataFrame, file_path: &str) -> Result<(), Util
     let mut buf = vec![];
     let schema = Schema::from(df.clone().schema());
     let mut stream = df.execute_stream().await?;
-    let mut writer = AsyncArrowWriter::try_new(&mut buf, schema.into(), None)?;
+    let mut writer = AsyncArrowWriter::try_new(&mut buf, Arc::new(schema), None)?;
     while let Some(batch) = stream.next().await.transpose()? {
         writer.write(&batch).await?;
     }
