@@ -27,13 +27,13 @@ pub async fn create_df1() -> Result<()> {
         Field::new("name", DataType::Utf8, true),
     ]);
     let batch = RecordBatch::try_new(
-        schema.clone().into(),
+        Arc::new(schema),
         vec![
             Arc::new(Int32Array::from(vec![1, 2, 3])),
             Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
         ],
     )?;
-    let df = ctx.read_batch(batch.clone())?;
+    let df = ctx.read_batch(batch)?;
 
     df.show().await?;
 
@@ -47,13 +47,13 @@ pub async fn create_df2() -> Result<()> {
         Field::new("data", DataType::Int32, true),
     ]);
     let batch = RecordBatch::try_new(
-        schema.clone().into(),
+        Arc::new(schema),
         vec![
             Arc::new(Int32Array::from(vec![1, 2, 3])),
             Arc::new(Int32Array::from(vec![42, 43, 44])),
         ],
     )?;
-    let df = ctx.read_batch(batch.clone())?;
+    let df = ctx.read_batch(batch)?;
 
     df.show().await?;
 
@@ -69,7 +69,7 @@ pub async fn create_df3() -> Result<()> {
         Field::new("data", DataType::Int32, true),
     ]);
     let batch = RecordBatch::try_new(
-        schema.clone().into(),
+        Arc::new(schema),
         vec![
             Arc::new(Int32Array::from(vec![1, 2, 3])),
             Arc::new(Int32Array::from(vec![1, 2, 3])),
@@ -77,7 +77,7 @@ pub async fn create_df3() -> Result<()> {
             Arc::new(Int32Array::from(vec![None, None, Some(44)])),
         ],
     )?;
-    let df = ctx.read_batch(batch.clone())?;
+    let df = ctx.read_batch(batch)?;
 
     df.show().await?;
 
@@ -99,7 +99,7 @@ pub async fn create_df4() -> Result<()> {
     let baz: StringArray = std::iter::repeat(Some("baz")).take(10).collect();
 
     let batch = RecordBatch::try_new(
-        schema.clone().into(),
+        Arc::new(schema),
         vec![
             Arc::new(id),
             Arc::new(foo),
@@ -108,7 +108,7 @@ pub async fn create_df4() -> Result<()> {
         ],
     )?;
 
-    let df = ctx.read_batch(batch.clone())?;
+    let df = ctx.read_batch(batch)?;
 
     df.show().await?;
 
@@ -124,7 +124,7 @@ pub async fn create_df5() -> Result<()> {
         Field::new("data", DataType::Int32, true),
     ]);
     let batch = RecordBatch::try_new(
-        schema.clone().into(),
+        Arc::new(schema),
         vec![
             Arc::new(Int32Array::from_iter(0..3_i32)),
             Arc::new(Int32Array::from(vec![1, 2, 3])),
@@ -132,7 +132,7 @@ pub async fn create_df5() -> Result<()> {
             Arc::new(Int32Array::from(vec![42, 43, 44])),
         ],
     )?;
-    let df = ctx.read_batch(batch.clone())?;
+    let df = ctx.read_batch(batch)?;
 
     df.show().await?;
 
@@ -168,7 +168,7 @@ pub async fn create_df_struct1() -> Result<()> {
     ]);
 
     let batch = RecordBatch::try_new(
-        schema.clone().into(),
+        Arc::new(schema),
         vec![
             Arc::new(ids),
             Arc::new(struct_array),
@@ -190,12 +190,12 @@ pub async fn create_df_struct2() -> Result<()> {
         Field::new("id", DataType::Int32, false),
     ]);
     let batch = RecordBatch::try_new(
-        schema.clone().into(),
+        Arc::new(schema),
         vec![
             Arc::new(Int32Array::from(vec![1, 2, 3])),
         ],
     )?;
-    let df = ctx.read_batch(batch.clone())?;
+    let df = ctx.read_batch(batch)?;
 
     let data1 = Arc::new(BooleanArray::from(vec![false]));
     let data2 = Arc::new(Int32Array::from(vec![42]));
@@ -203,15 +203,15 @@ pub async fn create_df_struct2() -> Result<()> {
     let struct_array = StructArray::from(vec![
         (
             Arc::new(Field::new("x", DataType::Boolean, false)),
-            data1.clone() as ArrayRef,
+            data1 as ArrayRef,
         ),
         (
             Arc::new(Field::new("y", DataType::Int32, false)),
-            data2.clone() as ArrayRef,
+            data2 as ArrayRef,
         ),
         (
             Arc::new(Field::new("z", DataType::Utf8, false)),
-            data3.clone() as ArrayRef,
+            data3 as ArrayRef,
         ),
     ]);
 
@@ -238,7 +238,7 @@ pub async fn create_df_list_arr() -> Result<()> {
     let list_array = ListArray::from_iter_primitive::<Int32Type, _, _>(my_list_data);
 
     let batch = RecordBatch::try_new(
-        schema.into(),
+        Arc::new(schema),
         vec![
             Arc::new(Int32Array::from(vec![1, 2, 3])),
             Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
