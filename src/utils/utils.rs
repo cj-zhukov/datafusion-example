@@ -51,17 +51,17 @@ macro_rules! df {
         use std::sync::Arc;
 
         let mut fields = vec![];
-        let mut columns: Vec<ArrayRef> = Vec::new();
+        let mut columns: Vec<ArrayRef> = vec![];
 
         $(
             let col = Arc::new($data) as ArrayRef;
-            let dtype = col.data_type();
-            fields.push(Field::new($col_name, dtype.clone(), false));
+            let dtype = col.data_type().clone();
+            fields.push(Field::new($col_name, dtype, true));
             columns.push(col);
         )+
 
         let schema = Arc::new(Schema::new(fields));
-        let batch = RecordBatch::try_new(schema.clone(), columns).expect("failed creating batch");
+        let batch = RecordBatch::try_new(schema, columns).expect("failed creating batch");
         let ctx = SessionContext::new();
         ctx.read_batch(batch).expect("failed creating dataframe")
     }};
