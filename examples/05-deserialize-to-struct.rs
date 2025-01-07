@@ -10,7 +10,7 @@ use tokio_stream::StreamExt;
 #[derive(Debug)]
 pub struct Foo {
     pub id: Option<i32>,
-    pub name: Option<String>, 
+    pub name: Option<String>,
     pub data_val: Option<Vec<u8>>,
 }
 
@@ -42,12 +42,8 @@ impl Foo {
             for (id, name, data_val) in izip!(ids, names, data_vals) {
                 let name = name.map(|x| String::from_utf8(x.into()).unwrap());
                 let data_val = data_val.map(|x| x.to_vec());
-                
-                records.push(Foo {
-                    id,
-                    name,
-                    data_val,
-                });
+
+                records.push(Foo { id, name, data_val });
             }
         }
 

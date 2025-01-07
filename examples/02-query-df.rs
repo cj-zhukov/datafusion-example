@@ -33,10 +33,13 @@ pub async fn query1() -> Result<()> {
     // how to register RecordBatch as table
     ctx.register_batch("t", batch)?;
 
-    let df = ctx.
-        sql("select * from t \
-            where id > 10").await?;        
-  
+    let df = ctx
+        .sql(
+            "select * from t \
+            where id > 10",
+        )
+        .await?;
+
     df.show().await?;
 
     Ok(())

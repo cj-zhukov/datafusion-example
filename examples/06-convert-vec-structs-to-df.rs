@@ -10,7 +10,7 @@ use serde::Serialize;
 #[derive(Serialize)]
 pub struct Foo {
     pub id: i32,
-    pub name: String, 
+    pub name: String,
 }
 
 impl Foo {
@@ -47,9 +47,18 @@ impl Foo {
 
 fn get_foos() -> Vec<Foo> {
     let mut records = vec![];
-    let rec1 = Foo { id: 42, name: "foo".to_string() };
-    let rec2 = Foo { id: 43, name: "bar".to_string() };
-    let rec3 = Foo { id: 44, name: "baz".to_string() };
+    let rec1 = Foo {
+        id: 42,
+        name: "foo".to_string(),
+    };
+    let rec2 = Foo {
+        id: 43,
+        name: "bar".to_string(),
+    };
+    let rec3 = Foo {
+        id: 44,
+        name: "baz".to_string(),
+    };
     records.push(rec1);
     records.push(rec2);
     records.push(rec3);

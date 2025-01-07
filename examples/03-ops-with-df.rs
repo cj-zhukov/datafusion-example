@@ -1,11 +1,13 @@
 use std::sync::Arc;
 
 use color_eyre::Result;
-use datafusion::arrow::array::{ArrayRef, AsArray, Float32Array, Int32Array, ListArray, RecordBatch, StringArray};
-use datafusion::arrow::datatypes::{DataType, Field, Float32Type, Int32Type, Schema};
+use datafusion::arrow::array::{
+    ArrayRef, AsArray, Float32Array, Int32Array, ListArray, RecordBatch, StringArray,
+};
 use datafusion::arrow::compute::concat;
-use datafusion::{arrow, assert_batches_eq, prelude::*};
+use datafusion::arrow::datatypes::{DataType, Field, Float32Type, Int32Type, Schema};
 use datafusion::scalar::ScalarValue;
+use datafusion::{arrow, assert_batches_eq, prelude::*};
 use datafusion_example::utils::scalarvalue::parse_strings;
 use datafusion_example::utils::utils::df_to_table;
 use tokio_stream::StreamExt;
@@ -19,7 +21,7 @@ async fn main() -> Result<()> {
     df_cols_to_struct().await?;
     update_col_df1().await?;
     update_col_df2().await?;
-    assert1().await?;   
+    assert1().await?;
     assert2().await?;
     downcast_df().await?;
     downcast_df2();
@@ -54,17 +56,17 @@ pub async fn join() -> Result<()> {
     ctx.register_batch("t1", batch1)?;
     ctx.register_batch("t2", batch2)?;
     let df1 = ctx.table("t1").await?;
-    let df2 = ctx.table("t2").await?
-        .select(vec![
-            col("id").alias("id2"),
-            col("name").alias("name2")])?;
+    let df2 = ctx
+        .table("t2")
+        .await?
+        .select(vec![col("id").alias("id2"), col("name").alias("name2")])?;
 
     let joined = df1
         .join(df2, JoinType::Inner, &["id"], &["id2"], None)?
         .select_columns(&["id", "name", "name2"])?;
 
     joined.show().await?;
-    
+
     Ok(())
 }
 
@@ -96,13 +98,16 @@ pub async fn join_sql() -> Result<()> {
     ctx.register_batch("t2", batch2)?;
 
     let res = ctx
-        .sql("select t1.id as id1, t1.name as name1, t2.name as name2 \
+        .sql(
+            "select t1.id as id1, t1.name as name1, t2.name as name2 \
             from t1 \
             inner join t2 on t1.id = t2.id \
-            where t1.id = 'foo'").await?;
+            where t1.id = 'foo'",
+        )
+        .await?;
 
     res.show().await?;
-    
+
     Ok(())
 }
 
@@ -159,7 +164,7 @@ pub async fn add_str_col() -> Result<()> {
         let array = concat(&array)?;
         arrays.push(array);
     }
-    
+
     let new_col = vec!["foo", "bar", "baz"];
     let new_col: ArrayRef = Arc::new(StringArray::from(new_col));
     arrays.push(new_col);
@@ -193,7 +198,9 @@ pub async fn df_cols_to_struct() -> Result<()> {
     let ctx = SessionContext::new();
     let df = ctx.read_batch(batch)?;
     df_to_table(&ctx, df, "t").await?;
-    let res = ctx.sql("select id, struct(name as name, data as data) as new_col from t").await?;
+    let res = ctx
+        .sql("select id, struct(name as name, data as data) as new_col from t")
+        .await?;
 
     res.show().await?;
 
@@ -220,13 +227,10 @@ pub async fn update_col_df1() -> Result<()> {
     res.show().await?;
 
     // Using DataFrame API to increment the column
-    let res = ctx   
+    let res = ctx
         .table("t")
         .await?
-        .select(vec![
-            (col("id") + lit(1)).alias("id"),
-            col("data")
-        ])?;
+        .select(vec![(col("id") + lit(1)).alias("id"), col("data")])?;
     res.show().await?;
 
     Ok(())
@@ -246,17 +250,19 @@ pub async fn update_col_df2() -> Result<()> {
     )?;
     let ctx = SessionContext::new();
     ctx.register_batch("t", batch)?;
-    
+
     // update table by some createria
-    let res = ctx.sql(
-        "select 
+    let res = ctx
+        .sql(
+            "select 
             id,
             case 
                 when id = 1 then data * data
                 else data
             end AS data
-        from t"
-    ).await?;
+        from t",
+        )
+        .await?;
 
     res.show().await?;
 
@@ -428,13 +434,11 @@ pub fn downcast_df2() {
     let scalars = vec![
         ScalarValue::Int32(Some(1)),
         ScalarValue::Int32(None),
-        ScalarValue::Int32(Some(2))
+        ScalarValue::Int32(Some(2)),
     ];
     let result = ScalarValue::new_list_from_iter(scalars.into_iter(), &DataType::Int32, true);
-    let expected = ListArray::from_iter_primitive::<Int32Type, _, _>(
-        vec![
-        Some(vec![Some(1), None, Some(2)])
-        ]);
+    let expected =
+        ListArray::from_iter_primitive::<Int32Type, _, _>(vec![Some(vec![Some(1), None, Some(2)])]);
 
     assert_eq!(*result, expected);
 }

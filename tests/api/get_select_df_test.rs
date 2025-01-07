@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use datafusion::prelude::*;
-use datafusion::arrow::array::{Int32Array, StringArray, RecordBatch};
+use datafusion::arrow::array::{Int32Array, RecordBatch, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::assert_batches_eq;
+use datafusion::prelude::*;
 
 use datafusion_example::utils::utils::*;
 
@@ -21,7 +21,8 @@ fn test_get_column_names() {
             Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
             Arc::new(Int32Array::from(vec![42, 43, 44])),
         ],
-    ).unwrap();
+    )
+    .unwrap();
 
     let ctx = SessionContext::new();
     let df = ctx.read_batch(batch).unwrap();
@@ -45,25 +46,26 @@ async fn test_select_all_exclude() {
             Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
             Arc::new(Int32Array::from(vec![42, 43, 44])),
         ],
-    ).unwrap();
+    )
+    .unwrap();
 
     let ctx = SessionContext::new();
     let df = ctx.read_batch(batch).unwrap();
     let res = select_all_exclude(df, &["pkey", "data"]).unwrap();
-    
+
     assert_eq!(res.schema().fields().len(), 2); // columns count
     assert_eq!(res.clone().count().await.unwrap(), 3); // rows count
 
     let rows = res.sort(vec![col("id").sort(true, true)]).unwrap();
     assert_batches_eq!(
         &[
-              "+----+------+",
-              "| id | name |",
-              "+----+------+",
-              "| 1  | foo  |",
-              "| 2  | bar  |",
-              "| 3  | baz  |",
-              "+----+------+",
+            "+----+------+",
+            "| id | name |",
+            "+----+------+",
+            "| 1  | foo  |",
+            "| 2  | bar  |",
+            "| 3  | baz  |",
+            "+----+------+",
         ],
         &rows.collect().await.unwrap()
     );

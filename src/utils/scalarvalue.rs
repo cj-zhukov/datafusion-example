@@ -1,6 +1,8 @@
 use std::{str::FromStr, sync::Arc};
 
-use datafusion::arrow::array::{Array, ArrayRef, BooleanArray, Int32Array, PrimitiveArray, StringArray};
+use datafusion::arrow::array::{
+    Array, ArrayRef, BooleanArray, Int32Array, PrimitiveArray, StringArray,
+};
 use datafusion::arrow::datatypes::{ArrowPrimitiveType, DataType, Int32Type, UInt32Type};
 use datafusion::scalar::ScalarValue;
 
@@ -41,20 +43,20 @@ fn parse_to_primitive<'a, T, I>(iter: I) -> PrimitiveArray<T>
 where
     T: ArrowPrimitiveType,
     T::Native: FromStr,
-    I: IntoIterator<Item=&'a str>,
+    I: IntoIterator<Item = &'a str>,
 {
     PrimitiveArray::from_iter(iter.into_iter().map(|val| T::Native::from_str(val).ok()))
 }
 
 pub fn parse_strings<'a, I>(iter: I, to_data_type: DataType) -> ArrayRef
 where
-    I: IntoIterator<Item=&'a str>,
+    I: IntoIterator<Item = &'a str>,
 {
-   match to_data_type {
-       DataType::Int32 => Arc::new(parse_to_primitive::<Int32Type, _>(iter)) as _,
-       DataType::UInt32 => Arc::new(parse_to_primitive::<UInt32Type, _>(iter)) as _,
-       _ => unimplemented!()
-   }
+    match to_data_type {
+        DataType::Int32 => Arc::new(parse_to_primitive::<Int32Type, _>(iter)) as _,
+        DataType::UInt32 => Arc::new(parse_to_primitive::<UInt32Type, _>(iter)) as _,
+        _ => unimplemented!(),
+    }
 }
 
 impl ScalarValueNew {
@@ -63,7 +65,7 @@ impl ScalarValueNew {
             DataType::Boolean => typed_cast!(array, index, BooleanArray, Boolean),
             DataType::Int32 => typed_cast!(array, index, Int32Array, Int32),
             DataType::Utf8 => typed_cast!(array, index, StringArray, Utf8),
-            _ => unimplemented!()
+            _ => unimplemented!(),
         })
     }
 }

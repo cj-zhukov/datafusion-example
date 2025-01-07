@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use datafusion::prelude::*;
-use datafusion::arrow::array::{Array, Int32Array, StringArray, RecordBatch};
+use datafusion::arrow::array::{Array, Int32Array, RecordBatch, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::assert_batches_eq;
+use datafusion::prelude::*;
 
-use datafusion_example::utils::utils::*;
 use datafusion_example::df;
+use datafusion_example::utils::utils::*;
 
 #[tokio::test]
 async fn test_df_macro() {
@@ -22,7 +22,7 @@ async fn test_df_macro() {
 
     assert_eq!(df.schema().fields().len(), 3); // columns count
     assert_eq!(df.clone().count().await.unwrap(), 3); // rows count
-    
+
     let rows = df.sort(vec![col("id").sort(true, true)]).unwrap();
     assert_batches_eq!(
         &[
@@ -52,7 +52,8 @@ async fn test_df_sql() {
             Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
             Arc::new(Int32Array::from(vec![42, 43, 44])),
         ],
-    ).unwrap();
+    )
+    .unwrap();
 
     let ctx = SessionContext::new();
     let df = ctx.read_batch(batch).unwrap();
@@ -61,7 +62,7 @@ async fn test_df_sql() {
 
     assert_eq!(res.schema().fields().len(), 3);
     assert_eq!(res.clone().count().await.unwrap(), 1);
-    
+
     let rows = res.sort(vec![col("id").sort(true, true)]).unwrap();
     assert_batches_eq!(
         &[
@@ -89,7 +90,8 @@ async fn test_is_empty() {
             Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
             Arc::new(Int32Array::from(vec![42, 43, 44])),
         ],
-    ).unwrap();
+    )
+    .unwrap();
 
     let ctx = SessionContext::new();
     let df = ctx.read_batch(batch).unwrap();
@@ -106,7 +108,6 @@ async fn test_df_to_table() {
         Field::new("id", DataType::Int32, false),
         Field::new("data", DataType::Int32, true),
         Field::new("name", DataType::Utf8, true),
-
     ]);
     let batch = RecordBatch::try_new(
         schema.clone().into(),
@@ -115,7 +116,8 @@ async fn test_df_to_table() {
             Arc::new(Int32Array::from(vec![42, 43, 44])),
             Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
         ],
-    ).unwrap();
+    )
+    .unwrap();
 
     let ctx = SessionContext::new();
     let df = ctx.read_batch(batch).unwrap();

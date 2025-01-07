@@ -36,8 +36,13 @@ pub async fn round_robin_example() -> Result<()> {
 
     let mut cur_worker = 1;
     while cur_worker <= 5 {
-        let round_robin_sql = format!("(({cur_worker} - 1) % (select count(*) from {table_name})) + 1");
-        let df = ctx.sql(&format!("select * from {table_name} where id = {round_robin_sql}")).await?;
+        let round_robin_sql =
+            format!("(({cur_worker} - 1) % (select count(*) from {table_name})) + 1");
+        let df = ctx
+            .sql(&format!(
+                "select * from {table_name} where id = {round_robin_sql}"
+            ))
+            .await?;
         df.show().await?;
         cur_worker += 1;
     }
@@ -64,11 +69,13 @@ pub async fn random_example() -> Result<()> {
     let table_name = "t";
     df_to_table(&ctx, df, table_name).await?;
 
-    let sql = format!("select *
+    let sql = format!(
+        "select *
                                 from {table_name} 
                                 where 1 = 1 
                                 order by random()
-                                limit 1");
+                                limit 1"
+    );
 
     for _ in 0..5 {
         let df = ctx.sql(&sql).await?;
@@ -98,13 +105,15 @@ pub async fn least_values_example() -> Result<()> {
     let col_val = "id";
     df_to_table(&ctx, df, table_name).await?;
 
-    let sql = format!("select *
+    let sql = format!(
+        "select *
                                 from {table_name} 
                                 where 1 = 1 
-                                and {col_val} = (select min({col_val}) from {table_name})");
+                                and {col_val} = (select min({col_val}) from {table_name})"
+    );
 
     let df = ctx.sql(&sql).await?;
     df.show().await?;
-    
+
     Ok(())
 }
