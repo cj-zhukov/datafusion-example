@@ -530,10 +530,17 @@ pub async fn df_cols_to_struct(ctx: &SessionContext, df: DataFrame, cols: &[&str
 
 /// Read parquet file to dataframe
 pub async fn read_file_to_df(ctx: &SessionContext, file_path: &str) -> Result<DataFrame, UtilsError> {
-    // #TODO read file by chunk
-    let mut buf = vec![];
-    let _n = File::open(file_path).await?.read_to_end(&mut buf).await?;
-    let stream = ParquetRecordBatchStreamBuilder::new(Cursor::new(buf))
+    let mut file = File::open(file_path).await?;
+    let mut buffer = [0; 1024];
+    let mut data = vec![];
+    loop {
+        let n = file.read(&mut buffer[..]).await?;
+        if n == 0 {
+            break;
+        }
+        data.extend_from_slice(&buffer[..n]);
+    }
+    let stream = ParquetRecordBatchStreamBuilder::new(Cursor::new(data))
         .await?
         .build()?;
     let batches = stream.try_collect::<Vec<_>>().await?;
