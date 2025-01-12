@@ -8,6 +8,8 @@ use datafusion::prelude::*;
 use datafusion_example::df;
 use datafusion_example::utils::utils::*;
 
+use crate::helpers::{get_df1, get_schema};
+
 #[tokio::test]
 async fn test_df_macro() {
     let id = Int32Array::from(vec![1, 2, 3]);
@@ -40,23 +42,7 @@ async fn test_df_macro() {
 
 #[tokio::test]
 async fn test_df_sql() {
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, true),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )
-    .unwrap();
-
-    let ctx = SessionContext::new();
-    let df = ctx.read_batch(batch).unwrap();
+    let df = get_df1().await.unwrap();
     let sql = r#"id > 2 and data > 43 and name in ('foo', 'bar', 'baz')"#;
     let res = df_sql(df, sql).await.unwrap();
 
@@ -78,59 +64,30 @@ async fn test_df_sql() {
 
 #[tokio::test]
 async fn test_is_empty() {
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, true),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.clone().into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )
-    .unwrap();
-
     let ctx = SessionContext::new();
-    let df = ctx.read_batch(batch).unwrap();
+    let df = get_df1().await.unwrap();
     assert_eq!(is_empty(df).await.unwrap(), false);
 
-    let batch = RecordBatch::new_empty(schema.into());
+    let schema = get_schema();
+    let batch = RecordBatch::new_empty(Arc::new(schema));
     let df = ctx.read_batch(batch).unwrap();
     assert_eq!(is_empty(df).await.unwrap(), true);
 }
 
 #[tokio::test]
 async fn test_df_to_table() {
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("data", DataType::Int32, true),
-        Field::new("name", DataType::Utf8, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.clone().into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-        ],
-    )
-    .unwrap();
-
     let ctx = SessionContext::new();
-    let df = ctx.read_batch(batch).unwrap();
+    let df = get_df1().await.unwrap();
     df_to_table(&ctx, df, "t").await.unwrap();
     let res = ctx.sql("select * from t order by id").await.unwrap();
     assert_batches_eq!(
         &[
             "+----+------+------+",
-            "| id | data | name |",
+            "| id | name | data |",
             "+----+------+------+",
-            "| 1  | 42   | foo  |",
-            "| 2  | 43   | bar  |",
-            "| 3  | 44   | baz  |",
+            "| 1  | foo  | 42   |",
+            "| 2  | bar  | 43   |",
+            "| 3  | baz  | 44   |",
             "+----+------+------+",
         ],
         &res.collect().await.unwrap()

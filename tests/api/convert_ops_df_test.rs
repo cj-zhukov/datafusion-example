@@ -10,6 +10,8 @@ use serde_json::{Map, Value};
 
 use datafusion_example::utils::utils::*;
 
+use crate::helpers::*;
+
 #[test]
 fn test_convert_cols_to_json() {
     let schema = Schema::new(vec![Field::new("a", DataType::Int32, false)]);
@@ -32,23 +34,8 @@ fn test_convert_cols_to_json() {
 
 #[tokio::test]
 async fn test_concat_arrays() {
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, true),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )
-    .unwrap();
+    let df = get_df1().await.unwrap();
 
-    let ctx = SessionContext::new();
-    let df = ctx.read_batch(batch).unwrap();
     let arrays = concat_arrays(df).await.unwrap();
     assert_eq!(arrays.len(), 3);
 
@@ -81,23 +68,9 @@ async fn test_concat_arrays() {
 
 #[tokio::test]
 async fn test_cols_to_json() {
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, true),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )
-    .unwrap();
+    let df = get_df1().await.unwrap();
 
     let ctx = SessionContext::new();
-    let df = ctx.read_batch(batch).unwrap();
     let res = df_cols_to_json(&ctx, df, &["name", "data"], "metadata")
         .await
         .unwrap();
@@ -122,23 +95,9 @@ async fn test_cols_to_json() {
 
 #[tokio::test]
 async fn test_cols_to_struct() {
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, true),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )
-    .unwrap();
+    let df = get_df1().await.unwrap();
 
     let ctx = SessionContext::new();
-    let df = ctx.read_batch(batch).unwrap();
     let res = df_cols_to_struct(&ctx, df, &["name", "data"], "metadata")
         .await
         .unwrap();
@@ -163,24 +122,9 @@ async fn test_cols_to_struct() {
 
 #[tokio::test]
 async fn test_add_pk_to_df() {
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, true),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )
-    .unwrap();
+    let df = get_df1().await.unwrap();
 
     let ctx = SessionContext::new();
-    let df = ctx.read_batch(batch).unwrap();
-
     let res = add_pk_to_df(&ctx, df, "pk").await.unwrap();
 
     assert_eq!(res.schema().fields().len(), 4); // columns count
@@ -203,24 +147,9 @@ async fn test_add_pk_to_df() {
 
 #[tokio::test]
 async fn test_concat_dfs() {
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, true),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )
-    .unwrap();
-
     let ctx = SessionContext::new();
-    let df1 = ctx.read_batch(batch).unwrap();
-    let df2 = df1.clone();
+    let df1 = get_df1().await.unwrap();
+    let df2 = get_df1().await.unwrap();
 
     let res = concat_dfs(&ctx, vec![df1, df2]).await.unwrap();
 
@@ -247,21 +176,8 @@ async fn test_concat_dfs() {
 
 #[tokio::test]
 async fn test_add_int_col_to_df() {
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-        ],
-    )
-    .unwrap();
-
     let ctx = SessionContext::new();
-    let df = ctx.read_batch(batch).unwrap();
+    let df = get_df2().await.unwrap();
 
     let data = vec![42, 43, 44];
     let res = add_int_col_to_df(&ctx, df, data, "data").await.unwrap();
@@ -286,21 +202,8 @@ async fn test_add_int_col_to_df() {
 
 #[tokio::test]
 async fn test_add_str_col_to_df() {
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )
-    .unwrap();
-
     let ctx = SessionContext::new();
-    let df = ctx.read_batch(batch).unwrap();
+    let df = get_df3().await.unwrap();
 
     let data = vec!["foo", "bar", "baz"];
     let res = add_str_col_to_df(&ctx, df, data, "name").await.unwrap();
@@ -325,21 +228,8 @@ async fn test_add_str_col_to_df() {
 
 #[tokio::test]
 async fn test_add_any_num_col_to_df() {
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )
-    .unwrap();
-
     let ctx = SessionContext::new();
-    let df = ctx.read_batch(batch).unwrap();
+    let df = get_df3().await.unwrap();
 
     let data = vec![1, 2, 3];
     let data_col = Int32Array::from(data);
@@ -373,21 +263,8 @@ async fn test_add_any_num_col_to_df() {
 
 #[tokio::test]
 async fn test_add_any_str_col_to_df() {
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )
-    .unwrap();
-
     let ctx = SessionContext::new();
-    let df = ctx.read_batch(batch).unwrap();
+    let df = get_df3().await.unwrap();
 
     let data = vec!["foo", "bar", "baz"];
     let data_col = StringArray::from(data);
@@ -421,21 +298,8 @@ async fn test_add_any_str_col_to_df() {
 
 #[tokio::test]
 async fn test_add_col_to_df() {
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )
-    .unwrap();
-
     let ctx = SessionContext::new();
-    let df = ctx.read_batch(batch).unwrap();
+    let df = get_df3().await.unwrap();
 
     let col1 = Arc::new(StringArray::from(vec!["foo", "bar", "baz"]));
     let col2 = Arc::new(Float64Array::from(vec![42.0, 43.0, 44.0]));
@@ -459,21 +323,8 @@ async fn test_add_col_to_df() {
 
 #[tokio::test]
 async fn test_add_col_arr_to_df() {
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )
-    .unwrap();
-
     let ctx = SessionContext::new();
-    let df = ctx.read_batch(batch).unwrap();
+    let df = get_df3().await.unwrap();
 
     let col1 = StringArray::from(vec!["foo", "bar", "baz"]);
     let col2 = Float64Array::from(vec![42.0, 43.0, 44.0]);

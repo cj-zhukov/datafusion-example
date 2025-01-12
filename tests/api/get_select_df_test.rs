@@ -1,57 +1,20 @@
-use std::sync::Arc;
-
-use datafusion::arrow::array::{Int32Array, RecordBatch, StringArray};
-use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::assert_batches_eq;
 use datafusion::prelude::*;
 
 use datafusion_example::utils::utils::*;
+use crate::helpers::*;
 
-#[test]
-fn test_get_column_names() {
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, true),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )
-    .unwrap();
-
-    let ctx = SessionContext::new();
-    let df = ctx.read_batch(batch).unwrap();
+#[tokio::test]
+async fn test_get_column_names() {
+    let df = get_df1().await.unwrap();
     let cols = get_column_names(df);
     assert_eq!(cols, vec!["id", "name", "data"]);
 }
 
 #[tokio::test]
 async fn test_select_all_exclude() {
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("pkey", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, true),
-        Field::new("data", DataType::Int32, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-            Arc::new(Int32Array::from(vec![42, 43, 44])),
-        ],
-    )
-    .unwrap();
-
-    let ctx = SessionContext::new();
-    let df = ctx.read_batch(batch).unwrap();
-    let res = select_all_exclude(df, &["pkey", "data"]).unwrap();
+    let df = get_df1().await.unwrap();
+    let res = select_all_exclude(df, &["data"]).unwrap();
 
     assert_eq!(res.schema().fields().len(), 2); // columns count
     assert_eq!(res.clone().count().await.unwrap(), 3); // rows count

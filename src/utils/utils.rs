@@ -9,6 +9,7 @@ use datafusion::arrow::compute::concat;
 use datafusion::arrow::datatypes::{ArrowPrimitiveType, ByteArrayType, DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::datasource::MemTable;
+use datafusion::logical_expr::LogicalPlanBuilder;
 use datafusion::prelude::*;
 use futures_util::TryStreamExt;
 use parquet::arrow::{AsyncArrowWriter, ParquetRecordBatchStreamBuilder};
@@ -569,7 +570,7 @@ pub async fn df_cols_to_struct(
 }
 
 /// Read parquet file to dataframe
-pub async fn read_file_to_df(
+pub async fn read_file_to_df(   
     ctx: &SessionContext,
     file_path: &str,
 ) -> Result<DataFrame, UtilsError> {
