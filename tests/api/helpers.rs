@@ -3,13 +3,11 @@ use std::sync::Arc;
 use color_eyre::Result;
 use datafusion::{arrow::{array::{Int32Array, RecordBatch, StringArray}, datatypes::{DataType, Field, Schema}}, prelude::*};
 
-/// Create json like string column new_col from cols
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
-/// # #[tokio::main]
-/// # async fn main() -> Result<()> {
-/// let df = get_df1().await?;
+/// # fn main() -> Result<()> {
+/// let df = get_df1()?;
 /// // +----+------+------+
 /// // | id | name | data |
 /// // +----+------+------+
@@ -20,7 +18,7 @@ use datafusion::{arrow::{array::{Int32Array, RecordBatch, StringArray}, datatype
 /// # Ok(())
 /// # }
 /// ```     
-pub async fn get_df1() -> Result<DataFrame> {
+pub fn get_df1() -> Result<DataFrame> {
     let ctx = SessionContext::new();
 
     let schema = Schema::new(vec![
@@ -41,13 +39,11 @@ pub async fn get_df1() -> Result<DataFrame> {
     Ok(ctx.read_batch(batch)?)
 }
 
-/// Create json like string column new_col from cols
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
-/// # #[tokio::main]
-/// # async fn main() -> Result<()> {
-/// let df = get_df2().await?;
+/// # fn main() -> Result<()> {
+/// let df = get_df2()?;
 /// // +----+------+
 /// // | id | name |
 /// // +----+------+
@@ -58,7 +54,7 @@ pub async fn get_df1() -> Result<DataFrame> {
 /// # Ok(())
 /// # }
 /// ``` 
-pub async fn get_df2() -> Result<DataFrame> {
+pub fn get_df2() -> Result<DataFrame> {
     let ctx = SessionContext::new();
 
     let schema = Schema::new(vec![
@@ -77,13 +73,11 @@ pub async fn get_df2() -> Result<DataFrame> {
     Ok(ctx.read_batch(batch)?)
 }   
 
-/// Create json like string column new_col from cols
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
-/// # #[tokio::main]
-/// # async fn main() -> Result<()> {
-/// let df = get_df3().await?;
+/// # fn main() -> Result<()> {
+/// let df = get_df3()?;
 /// // +----+-----+
 /// // | id | data|
 /// // +----+-----+
@@ -94,7 +88,7 @@ pub async fn get_df2() -> Result<DataFrame> {
 /// # Ok(())
 /// # }
 /// ``` 
-pub async fn get_df3() -> Result<DataFrame> {
+pub fn get_df3() -> Result<DataFrame> {
     let ctx = SessionContext::new();
 
     let schema = Schema::new(vec![
@@ -113,13 +107,11 @@ pub async fn get_df3() -> Result<DataFrame> {
     Ok(ctx.read_batch(batch)?)
 }   
 
-/// Create json like string column new_col from cols
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
-/// # #[tokio::main]
-/// # async fn main() -> Result<()> {
-/// let df = get_schema().await?;
+/// # fn main() -> Result<()> {
+/// let df = get_schema()?;
 /// // id Int32
 /// // name Utf8
 /// // data Int32

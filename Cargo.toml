@@ -4,22 +4,25 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tokio = { version = "1", features = ["full"] }
-tokio-stream = "0.1"
-futures-util = "0.3"
-datafusion = { version = "44", features = ["default"] }
 arrow-json = "53"
-parquet = "53"
-object_store = { version = "0.11", features = ["aws", "cloud"] }
-thiserror = "2"
-color-eyre = "0.6"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-itertools = "0.13"
 aws-config = "1"
 aws-sdk-s3 = "1"
 aws-creds = "0.37"
 aws-smithy-types = "1"
-url = "2"
+datafusion = { version = "44", features = ["default"] }
+color-eyre = "0.6"
 chrono = "0.4.38"
+futures-util = "0.3"
+itertools = "0.13"
+object_store = { version = "0.11", features = ["aws", "cloud"] }
+parquet = "53"
+tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
+thiserror = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+url = "2"
 time = "0.3.36"
+
+[dev-dependencies]
+rstest = "0.24"

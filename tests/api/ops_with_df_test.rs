@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use datafusion::arrow::array::{Array, Int32Array, RecordBatch, StringArray};
-use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::assert_batches_eq;
 use datafusion::prelude::*;
 
@@ -42,7 +41,7 @@ async fn test_df_macro() {
 
 #[tokio::test]
 async fn test_df_sql() {
-    let df = get_df1().await.unwrap();
+    let df = get_df1().unwrap();
     let sql = r#"id > 2 and data > 43 and name in ('foo', 'bar', 'baz')"#;
     let res = df_sql(df, sql).await.unwrap();
 
@@ -65,7 +64,7 @@ async fn test_df_sql() {
 #[tokio::test]
 async fn test_is_empty() {
     let ctx = SessionContext::new();
-    let df = get_df1().await.unwrap();
+    let df = get_df1().unwrap();
     assert_eq!(is_empty(df).await.unwrap(), false);
 
     let schema = get_schema();
@@ -77,7 +76,7 @@ async fn test_is_empty() {
 #[tokio::test]
 async fn test_df_to_table() {
     let ctx = SessionContext::new();
-    let df = get_df1().await.unwrap();
+    let df = get_df1().unwrap();
     df_to_table(&ctx, df, "t").await.unwrap();
     let res = ctx.sql("select * from t order by id").await.unwrap();
     assert_batches_eq!(
