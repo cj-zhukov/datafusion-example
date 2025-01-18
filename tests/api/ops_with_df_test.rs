@@ -3,6 +3,7 @@ use std::sync::Arc;
 use datafusion::arrow::array::{Array, Int32Array, RecordBatch, StringArray};
 use datafusion::assert_batches_eq;
 use datafusion::prelude::*;
+use tempfile::tempdir;
 
 use datafusion_example::df;
 use datafusion_example::utils::utils::*;
@@ -90,5 +91,28 @@ async fn test_df_to_table() {
             "+----+------+------+",
         ],
         &res.collect().await.unwrap()
+    );
+}
+
+#[tokio::test]
+async fn test_write_df_to_file() {
+    let ctx = SessionContext::new();
+    let df = get_df1().unwrap();
+    let dir = tempdir().unwrap();
+    let file_path = dir.path().join("foo.parquet");
+    write_df_to_file(df, file_path.to_str().unwrap()).await.unwrap();
+    let res = ctx.read_parquet(file_path.to_str().unwrap(), ParquetReadOptions::default()).await.unwrap();
+    let rows = res.sort(vec![col("id").sort(true, true)]).unwrap();
+    assert_batches_eq!(
+        &[
+            "+----+------+------+",
+            "| id | name | data |",
+            "+----+------+------+",
+            "| 1  | foo  | 42   |",
+            "| 2  | bar  | 43   |",
+            "| 3  | baz  | 44   |",
+            "+----+------+------+",
+        ],
+        &rows.collect().await.unwrap()
     );
 }
