@@ -9,7 +9,6 @@ use datafusion::arrow::compute::concat;
 use datafusion::arrow::datatypes::{ArrowPrimitiveType, ByteArrayType, DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::datasource::MemTable;
-use datafusion::logical_expr::LogicalPlanBuilder;
 use datafusion::prelude::*;
 use futures_util::TryStreamExt;
 use parquet::arrow::{AsyncArrowWriter, ParquetRecordBatchStreamBuilder};
