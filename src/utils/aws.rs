@@ -248,7 +248,7 @@ pub async fn write_batches_to_s3(
     let upload_id = multipart_upload_res
         .upload_id()
         .wrap_err(format!("failed get upload_id for key: {}", key))
-        .map_err(|e| UtilsError::UnexpectedError(e))?;
+        .map_err(UtilsError::UnexpectedError)?;
     let mut upload_parts: Vec<CompletedPart> = Vec::new();
     let mut stream = ByteStream::from(buf);
     let mut part_number = 1;

@@ -4,7 +4,7 @@ use datafusion::prelude::*;
 use rstest::rstest;
 
 use crate::helpers::*;
-use datafusion_example::utils::utils::*;
+use datafusion_example::utils::tools::*;
 
 #[rstest]
 #[case(get_df1()?, vec!["id", "name", "data"])]

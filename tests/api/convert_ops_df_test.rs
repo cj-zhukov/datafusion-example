@@ -9,7 +9,7 @@ use datafusion::assert_batches_eq;
 use datafusion::prelude::*;
 use serde_json::{Map, Value};
 
-use datafusion_example::utils::utils::*;
+use datafusion_example::utils::tools::*;
 
 use crate::helpers::*;
 

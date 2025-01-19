@@ -8,7 +8,7 @@ use datafusion::prelude::*;
 use tempfile::tempdir;
 
 use datafusion_example::df;
-use datafusion_example::utils::utils::*;
+use datafusion_example::utils::tools::*;
 
 use crate::helpers::{get_df1, get_schema};
 

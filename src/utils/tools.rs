@@ -74,7 +74,7 @@ macro_rules! df {
 /// # Examples
 /// ```
 /// use datafusion::arrow::array::{Int32Array, StringArray};
-/// # use datafusion_example::{df, utils::utils::df_sql};
+/// # use datafusion_example::{df, utils::tools::df_sql};
 /// let id = Int32Array::from(vec![1, 2, 3]);
 /// let name = StringArray::from(vec!["foo", "bar", "baz"]);
 /// let df = df!("id" => id, "name" => name);
@@ -112,7 +112,7 @@ pub async fn is_empty(df: DataFrame) -> Result<bool, UtilsError> {
 /// use datafusion::prelude::*;
 /// # use color_eyre::Result;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
-/// # use datafusion_example::{df, utils::utils::add_pk_to_df};
+/// # use datafusion_example::{df, utils::tools::add_pk_to_df};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 /// let id = Int32Array::from(vec![1, 2, 3]);
@@ -239,7 +239,7 @@ where
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
-/// # use datafusion_example::{df, utils::utils::add_col_to_df};
+/// # use datafusion_example::{df, utils::tools::add_col_to_df};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 /// let id = Int32Array::from(vec![1, 2, 3]);
@@ -279,7 +279,7 @@ pub async fn add_col_to_df(
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
-/// # use datafusion_example::{df, utils::utils::add_col_arr_to_df};
+/// # use datafusion_example::{df, utils::tools::add_col_arr_to_df};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 /// let id = Int32Array::from(vec![1, 2, 3]);
@@ -351,7 +351,7 @@ pub async fn add_col_arr_to_df(
 /// ```
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
-/// # use datafusion_example::{df, utils::utils::select_all_exclude};
+/// # use datafusion_example::{df, utils::tools::select_all_exclude};
 /// let id = Int32Array::from(vec![1, 2, 3]);
 /// let name = StringArray::from(vec!["foo", "bar", "baz"]);
 /// let data = Int32Array::from(vec![42, 43, 44]);
@@ -433,7 +433,7 @@ pub async fn concat_dfs(
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
-/// # use datafusion_example::{df, utils::utils::df_cols_to_json};
+/// # use datafusion_example::{df, utils::tools::df_cols_to_json};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 /// let id = Int32Array::from(vec![1, 2, 3]);
@@ -504,13 +504,13 @@ pub async fn df_cols_to_json(
 }
 
 /// Create nested struct column new_col from cols.
-/// Can de done using struct in query: ctx.sql("select id, struct(name as name, data as data) as new_col from t").await?;
+/// Can de done using 'struct' in query: ctx.sql("select id, struct(name as name, data as data) as new_col from t").await?;
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{Int32Array, StringArray};
-/// # use datafusion_example::{df, utils::utils::df_cols_to_struct};
+/// # use datafusion_example::{df, utils::tools::df_cols_to_struct};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 /// let id = Int32Array::from(vec![1, 2, 3]);
