@@ -1,7 +1,13 @@
 use std::sync::Arc;
 
 use color_eyre::Result;
-use datafusion::{arrow::{array::{Int32Array, RecordBatch, StringArray}, datatypes::{DataType, Field, Schema}}, prelude::*};
+use datafusion::{
+    arrow::{
+        array::{Int32Array, RecordBatch, StringArray},
+        datatypes::{DataType, Field, Schema},
+    },
+    prelude::*,
+};
 
 /// # Examples
 /// ```
@@ -53,7 +59,7 @@ pub fn get_df1() -> Result<DataFrame> {
 /// // +----+------+
 /// # Ok(())
 /// # }
-/// ``` 
+/// ```
 pub fn get_df2() -> Result<DataFrame> {
     let ctx = SessionContext::new();
 
@@ -71,7 +77,7 @@ pub fn get_df2() -> Result<DataFrame> {
     )?;
 
     Ok(ctx.read_batch(batch)?)
-}   
+}
 
 /// # Examples
 /// ```
@@ -87,7 +93,7 @@ pub fn get_df2() -> Result<DataFrame> {
 /// // +----+-----+
 /// # Ok(())
 /// # }
-/// ``` 
+/// ```
 pub fn get_df3() -> Result<DataFrame> {
     let ctx = SessionContext::new();
 
@@ -105,7 +111,7 @@ pub fn get_df3() -> Result<DataFrame> {
     )?;
 
     Ok(ctx.read_batch(batch)?)
-}   
+}
 
 /// # Examples
 /// ```
@@ -117,7 +123,7 @@ pub fn get_df3() -> Result<DataFrame> {
 /// // data Int32
 /// # Ok(())
 /// # }
-/// ``` 
+/// ```
 pub fn get_schema() -> Schema {
     Schema::new(vec![
         Field::new("id", DataType::Int32, false),

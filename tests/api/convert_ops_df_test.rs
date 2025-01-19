@@ -76,8 +76,7 @@ async fn test_cols_to_json() -> Result<()> {
     let df = get_df1()?;
 
     let ctx = SessionContext::new();
-    let res = df_cols_to_json(&ctx, df, &["name", "data"], "metadata")
-        .await?;
+    let res = df_cols_to_json(&ctx, df, &["name", "data"], "metadata").await?;
 
     assert_eq!(res.schema().fields().len(), 2); // columns count
     assert_eq!(res.clone().count().await?, 3); // rows count
@@ -104,8 +103,7 @@ async fn test_cols_to_struct() -> Result<()> {
     let df = get_df1()?;
 
     let ctx = SessionContext::new();
-    let res = df_cols_to_struct(&ctx, df, &["name", "data"], "metadata")
-        .await?;
+    let res = df_cols_to_struct(&ctx, df, &["name", "data"], "metadata").await?;
 
     assert_eq!(res.schema().fields().len(), 2); // columns count
     assert_eq!(res.clone().count().await?, 3); // rows count
@@ -248,13 +246,11 @@ async fn test_add_any_num_col_to_df() -> Result<()> {
 
     let data = vec![1, 2, 3];
     let data_col = Int32Array::from(data);
-    let df = add_any_num_col_to_df(&ctx, df, data_col, "col1")
-        .await?;
+    let df = add_any_num_col_to_df(&ctx, df, data_col, "col1").await?;
 
     let data = vec![1.1, 1.2, 1.3];
     let data_col = Float64Array::from(data);
-    let res = add_any_num_col_to_df(&ctx, df, data_col, "col2")
-        .await?;
+    let res = add_any_num_col_to_df(&ctx, df, data_col, "col2").await?;
 
     assert_eq!(res.schema().fields().len(), 4); // columns count
     assert_eq!(res.clone().count().await?, 3); // rows count
@@ -283,13 +279,11 @@ async fn test_add_any_str_col_to_df() -> Result<()> {
 
     let data = vec!["foo", "bar", "baz"];
     let data_col = StringArray::from(data);
-    let df = add_any_str_col_to_df(&ctx, df, data_col, "col1")
-        .await?;
+    let df = add_any_str_col_to_df(&ctx, df, data_col, "col1").await?;
 
     let data = vec!["foo", "bar", "baz"];
     let data_col = LargeStringArray::from(data);
-    let res = add_any_str_col_to_df(&ctx, df, data_col, "col2")
-        .await?;
+    let res = add_any_str_col_to_df(&ctx, df, data_col, "col2").await?;
 
     assert_eq!(res.schema().fields().len(), 4); // columns count
     assert_eq!(res.clone().count().await?, 3); // rows count

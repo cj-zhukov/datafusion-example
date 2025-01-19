@@ -569,7 +569,7 @@ pub async fn df_cols_to_struct(
 }
 
 /// Read parquet file to dataframe
-pub async fn read_file_to_df(   
+pub async fn read_file_to_df(
     ctx: &SessionContext,
     file_path: &str,
 ) -> Result<DataFrame, UtilsError> {

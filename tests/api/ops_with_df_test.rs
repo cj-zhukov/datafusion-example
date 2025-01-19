@@ -111,7 +111,9 @@ async fn test_write_df_to_file() -> Result<()> {
     let dir = tempdir()?;
     let file_path = dir.path().join("foo.parquet");
     write_df_to_file(df, file_path.to_str().unwrap()).await?;
-    let res = ctx.read_parquet(file_path.to_str().unwrap(), ParquetReadOptions::default()).await?;
+    let res = ctx
+        .read_parquet(file_path.to_str().unwrap(), ParquetReadOptions::default())
+        .await?;
     let rows = res.sort(vec![col("id").sort(true, true)])?;
     assert_batches_eq!(
         &[
@@ -135,7 +137,12 @@ async fn test_read_file_to_df() -> Result<()> {
     let df = get_df1()?;
     let dir = tempdir()?;
     let file_path = dir.path().join("foo.parquet");
-    df.write_parquet(file_path.to_str().unwrap(), DataFrameWriteOptions::new(), None).await?;
+    df.write_parquet(
+        file_path.to_str().unwrap(),
+        DataFrameWriteOptions::new(),
+        None,
+    )
+    .await?;
     let res = read_file_to_df(&ctx, file_path.to_str().unwrap()).await?;
     let rows = res.sort(vec![col("id").sort(true, true)])?;
     assert_batches_eq!(
