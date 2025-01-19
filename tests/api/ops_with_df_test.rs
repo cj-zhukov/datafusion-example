@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use color_eyre::Result;
 use datafusion::arrow::array::{Array, Int32Array, RecordBatch, StringArray};
 use datafusion::assert_batches_eq;
 use datafusion::dataframe::DataFrameWriteOptions;
@@ -12,7 +13,7 @@ use datafusion_example::utils::utils::*;
 use crate::helpers::{get_df1, get_schema};
 
 #[tokio::test]
-async fn test_df_macro() {
+async fn test_df_macro() -> Result<()> {
     let id = Int32Array::from(vec![1, 2, 3]);
     let data = Int32Array::from(vec![42, 43, 44]);
     let name = StringArray::from(vec![Some("foo"), Some("bar"), None]);
@@ -24,9 +25,9 @@ async fn test_df_macro() {
     );
 
     assert_eq!(df.schema().fields().len(), 3); // columns count
-    assert_eq!(df.clone().count().await.unwrap(), 3); // rows count
+    assert_eq!(df.clone().count().await?, 3); // rows count
 
-    let rows = df.sort(vec![col("id").sort(true, true)]).unwrap();
+    let rows = df.sort(vec![col("id").sort(true, true)])?;
     assert_batches_eq!(
         &[
             "+----+------+------+",
@@ -37,20 +38,22 @@ async fn test_df_macro() {
             "| 3  | 44   |      |",
             "+----+------+------+",
         ],
-        &rows.collect().await.unwrap()
+        &rows.collect().await?
     );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn test_df_sql() {
-    let df = get_df1().unwrap();
+async fn test_df_sql() -> Result<()> {
+    let df = get_df1()?;
     let sql = r#"id > 2 and data > 43 and name in ('foo', 'bar', 'baz')"#;
-    let res = df_sql(df, sql).await.unwrap();
+    let res = df_sql(df, sql).await?;
 
     assert_eq!(res.schema().fields().len(), 3);
-    assert_eq!(res.clone().count().await.unwrap(), 1);
+    assert_eq!(res.clone().count().await?, 1);
 
-    let rows = res.sort(vec![col("id").sort(true, true)]).unwrap();
+    let rows = res.sort(vec![col("id").sort(true, true)])?;
     assert_batches_eq!(
         &[
             "+----+------+------+",
@@ -59,28 +62,32 @@ async fn test_df_sql() {
             "| 3  | baz  | 44   |",
             "+----+------+------+",
         ],
-        &rows.collect().await.unwrap()
+        &rows.collect().await?
     );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn test_is_empty() {
+async fn test_is_empty() -> Result<()> {
     let ctx = SessionContext::new();
-    let df = get_df1().unwrap();
-    assert_eq!(is_empty(df).await.unwrap(), false);
+    let df = get_df1()?;
+    assert_eq!(is_empty(df).await?, false);
 
     let schema = get_schema();
     let batch = RecordBatch::new_empty(Arc::new(schema));
-    let df = ctx.read_batch(batch).unwrap();
-    assert_eq!(is_empty(df).await.unwrap(), true);
+    let df = ctx.read_batch(batch)?;
+    assert_eq!(is_empty(df).await?, true);
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn test_df_to_table() {
+async fn test_df_to_table() -> Result<()> {
     let ctx = SessionContext::new();
-    let df = get_df1().unwrap();
-    df_to_table(&ctx, df, "t").await.unwrap();
-    let res = ctx.sql("select * from t order by id").await.unwrap();
+    let df = get_df1()?;
+    df_to_table(&ctx, df, "t").await?;
+    let res = ctx.sql("select * from t order by id").await?;
     assert_batches_eq!(
         &[
             "+----+------+------+",
@@ -91,19 +98,21 @@ async fn test_df_to_table() {
             "| 3  | baz  | 44   |",
             "+----+------+------+",
         ],
-        &res.collect().await.unwrap()
+        &res.collect().await?
     );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn test_write_df_to_file() {
+async fn test_write_df_to_file() -> Result<()> {
     let ctx = SessionContext::new();
-    let df = get_df1().unwrap();
-    let dir = tempdir().unwrap();
+    let df = get_df1()?;
+    let dir = tempdir()?;
     let file_path = dir.path().join("foo.parquet");
-    write_df_to_file(df, file_path.to_str().unwrap()).await.unwrap();
-    let res = ctx.read_parquet(file_path.to_str().unwrap(), ParquetReadOptions::default()).await.unwrap();
-    let rows = res.sort(vec![col("id").sort(true, true)]).unwrap();
+    write_df_to_file(df, file_path.to_str().unwrap()).await?;
+    let res = ctx.read_parquet(file_path.to_str().unwrap(), ParquetReadOptions::default()).await?;
+    let rows = res.sort(vec![col("id").sort(true, true)])?;
     assert_batches_eq!(
         &[
             "+----+------+------+",
@@ -114,19 +123,21 @@ async fn test_write_df_to_file() {
             "| 3  | baz  | 44   |",
             "+----+------+------+",
         ],
-        &rows.collect().await.unwrap()
+        &rows.collect().await?
     );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn test_read_file_to_df() {
+async fn test_read_file_to_df() -> Result<()> {
     let ctx = SessionContext::new();
-    let df = get_df1().unwrap();
-    let dir = tempdir().unwrap();
+    let df = get_df1()?;
+    let dir = tempdir()?;
     let file_path = dir.path().join("foo.parquet");
-    df.write_parquet(file_path.to_str().unwrap(), DataFrameWriteOptions::new(), None).await.unwrap();
-    let res = read_file_to_df(&ctx, file_path.to_str().unwrap()).await.unwrap();
-    let rows = res.sort(vec![col("id").sort(true, true)]).unwrap();
+    df.write_parquet(file_path.to_str().unwrap(), DataFrameWriteOptions::new(), None).await?;
+    let res = read_file_to_df(&ctx, file_path.to_str().unwrap()).await?;
+    let rows = res.sort(vec![col("id").sort(true, true)])?;
     assert_batches_eq!(
         &[
             "+----+------+------+",
@@ -137,6 +148,8 @@ async fn test_read_file_to_df() {
             "| 3  | baz  | 44   |",
             "+----+------+------+",
         ],
-        &rows.collect().await.unwrap()
+        &rows.collect().await?
     );
+
+    Ok(())
 }
