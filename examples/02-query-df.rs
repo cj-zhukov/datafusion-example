@@ -11,6 +11,7 @@ async fn main() -> Result<()> {
     query1().await?;
     query2().await?;
     query3().await?;
+    query4().await?;
 
     Ok(())
 }
@@ -101,6 +102,16 @@ pub async fn query3() -> Result<()> {
                     and data >= 42 
                     and name in ('foo', 'bar')"#;
     let res = ctx.sql(sql).await?;
+    res.show().await?;
+
+    Ok(())
+}
+
+pub async fn query4() -> Result<()> {
+    let ctx = SessionContext::new();
+    ctx.register_parquet("test", ".data/alltypes_plain.parquet", ParquetReadOptions::default()).await?;
+    ctx.register_table("t", ctx.table("test").await?.into_view())?;
+    let res = ctx.sql("select * from t").await?;
     res.show().await?;
 
     Ok(())
