@@ -8,7 +8,8 @@ use datafusion::arrow::array::{
 use datafusion::arrow::compute::concat;
 use datafusion::arrow::datatypes::{ArrowPrimitiveType, ByteArrayType, DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::datasource::MemTable;
+use datafusion::datasource::{MemTable, ViewTable};
+use datafusion::logical_expr::LogicalPlan;
 use datafusion::prelude::*;
 use futures_util::TryStreamExt;
 use parquet::arrow::{AsyncArrowWriter, ParquetRecordBatchStreamBuilder};
@@ -616,5 +617,16 @@ pub async fn df_to_table(
     let batches = df.collect().await?;
     let mem_table = MemTable::try_new(Arc::new(schema), vec![batches])?;
     ctx.register_table(table_name, Arc::new(mem_table))?;
+    Ok(())
+}
+
+/// Register dataframe plan as table to query later
+pub async fn df_plan_to_table(
+    ctx: &SessionContext,
+    plan: LogicalPlan,
+    table_name: &str,
+) -> Result<(), UtilsError> {
+    let view = ViewTable::try_new(plan, None)?;
+    ctx.register_table(table_name, Arc::new(view))?;
     Ok(())
 }

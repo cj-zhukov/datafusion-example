@@ -113,6 +113,5 @@ pub async fn query4() -> Result<()> {
     ctx.register_table("t", ctx.table("test").await?.into_view())?;
     let res = ctx.sql("select * from t").await?;
     res.show().await?;
-
     Ok(())
 }

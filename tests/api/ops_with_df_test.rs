@@ -103,6 +103,27 @@ async fn test_df_to_table() -> Result<()> {
 
     Ok(())
 }
+#[tokio::test]
+async fn test_df_plan_to_table() -> Result<()> {
+    let ctx = SessionContext::new();
+    let df = get_df1()?;
+    df_plan_to_table(&ctx, df.logical_plan().clone(), "t").await?;
+    let res = ctx.sql("select * from t order by id").await?;
+    assert_batches_eq!(
+        &[
+            "+----+------+------+",
+            "| id | name | data |",
+            "+----+------+------+",
+            "| 1  | foo  | 42   |",
+            "| 2  | bar  | 43   |",
+            "| 3  | baz  | 44   |",
+            "+----+------+------+",
+        ],
+        &res.collect().await?
+    );
+
+    Ok(())
+}
 
 #[tokio::test]
 async fn test_write_df_to_file() -> Result<()> {
