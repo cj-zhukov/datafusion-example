@@ -4,25 +4,25 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-arrow-json = "53"
+arrow-json = "54"
 aws-config = "1"
 aws-sdk-s3 = "1"
 aws-creds = "0.37"
 aws-smithy-types = "1"
-datafusion = { version = "44", features = ["default"] }
+datafusion = "45"
 color-eyre = "0.6"
 chrono = "0.4.38"
 futures-util = "0.3"
 itertools = "0.13"
 object_store = { version = "0.11", features = ["aws", "cloud"] }
-parquet = "53"
+parquet = "54"
 tokio = { version = "1", features = ["full"] }
+time = "0.3.36"
 tokio-stream = "0.1"
 thiserror = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 url = "2"
-time = "0.3.36"
 
 [dev-dependencies]
 tempfile = "3.15"
