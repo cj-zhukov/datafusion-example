@@ -14,10 +14,9 @@ use tokio_stream::StreamExt;
 async fn main() -> Result<()> {
     demo_struct().await?;
     record_batches_to_json_rows()?;
-    // df_cols_to_json_example().await?; // #TODO schema error
+    df_cols_to_json_example().await?;
     df_cols_to_struct_example().await?;
     scalar_new_example().await?;
-
     Ok(())
 }
 
@@ -213,8 +212,9 @@ pub async fn df_cols_to_json_example() -> Result<()> {
         ],
     )?;
     let df_to_json = ctx.read_batch(batch.clone())?;
+    let df_to_json = df_to_json.with_column_renamed("id", "id2")?;
 
-    let res = df.join(df_to_json, JoinType::Inner, &["id"], &["id"], None)?;
+    let res = df.join(df_to_json, JoinType::Inner, &["id"], &["id2"], None)?;
     res.show().await?;
 
     Ok(())
