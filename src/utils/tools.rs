@@ -48,6 +48,7 @@ macro_rules! df {
         ctx.read_empty().expect("failed creating empty dataframe")
     }};
 
+    // ($($col_name:expr_2021 => $data:expr_2021),+) => {{ // #TODO expr_2021 vs expr
     ($($col_name:expr => $data:expr),+) => {{
         use datafusion::prelude::*;
         use datafusion::arrow::array::{RecordBatch, ArrayRef};
