@@ -11,7 +11,7 @@ use datafusion_example::utils::tools::*;
 #[case(get_df2()?, vec!["id", "name"])]
 #[case(get_df3()?, vec!["id", "data"])]
 fn test_get_column_names(#[case] df: DataFrame, #[case] expected: Vec<&str>) -> Result<()> {
-    assert_eq!(expected, get_column_names(df));
+    assert_eq!(expected, get_column_names(&df));
     Ok(())
 }
 

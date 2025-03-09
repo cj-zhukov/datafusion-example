@@ -388,11 +388,11 @@ pub fn select_all_exclude(df: DataFrame, to_exclude: &[&str]) -> Result<DataFram
 }
 
 /// Get dataframe columns names
-pub fn get_column_names(df: DataFrame) -> Vec<String> {
+pub fn get_column_names(df: &DataFrame) -> Vec<&str> {
     df.schema()
         .fields()
         .iter()
-        .map(|x| x.name().to_string())
+        .map(|col| col.name().as_str())
         .collect::<Vec<_>>()
 }
 
