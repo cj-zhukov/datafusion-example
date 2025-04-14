@@ -12,7 +12,7 @@ async fn main() -> Result<()> {
     query2().await?;
     query3().await?;
     query4().await?;
-
+    view_example().await?;
     Ok(())
 }
 
@@ -109,9 +109,33 @@ pub async fn query3() -> Result<()> {
 
 pub async fn query4() -> Result<()> {
     let ctx = SessionContext::new();
-    ctx.register_parquet("test", ".data/alltypes_plain.parquet", ParquetReadOptions::default()).await?;
-    ctx.register_table("t", ctx.table("test").await?.into_view())?;
+    ctx.register_parquet("t", ".data/alltypes_plain.parquet", ParquetReadOptions::default()).await?;
     let res = ctx.sql("select * from t").await?;
+    res.show().await?;
+    Ok(())
+}
+
+pub async fn view_example() -> Result<()> {
+    let schema = Arc::new(Schema::new(vec![
+        Field::new("id", DataType::Int32, false),
+        Field::new("name", DataType::Utf8, false),
+        Field::new("data", DataType::Int32, false),
+    ]));
+
+    let batch = RecordBatch::try_new(
+        schema,
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])),
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+            Arc::new(Int32Array::from(vec![42, 43, 44])),
+        ],
+    )?;
+    let ctx = SessionContext::new();
+    let df = ctx.read_batch(batch)?;
+    
+    let view = df.into_view();
+    ctx.register_table("view", view)?;
+    let res = ctx.sql("select * from view limit 1").await?;
     res.show().await?;
     Ok(())
 }
