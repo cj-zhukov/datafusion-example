@@ -627,7 +627,7 @@ pub async fn df_plan_to_table(
     plan: LogicalPlan,
     table_name: &str,
 ) -> Result<(), UtilsError> {
-    let view = ViewTable::try_new(plan, None)?;
+    let view = ViewTable::new(plan, None);
     ctx.register_table(table_name, Arc::new(view))?;
     Ok(())
 }
