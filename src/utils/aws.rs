@@ -24,8 +24,8 @@ use crate::error::UtilsError;
 
 const AWS_MAX_RETRIES: u32 = 10;
 
-pub async fn get_aws_client(region: &str) -> Client {
-    let region = Region::new(region.to_string());
+pub async fn get_aws_client(region: String) -> Client {
+    let region = Region::new(region);
 
     let sdk_config = aws_config::defaults(BehaviorVersion::latest())
         .region(region)
@@ -42,32 +42,29 @@ pub async fn get_aws_client(region: &str) -> Client {
 
 /// Get aws GetObjectOutput
 pub async fn get_aws_object(
-    client: Client,
+    client: &Client,
     bucket: &str,
     key: &str,
 ) -> Result<GetObjectOutput, UtilsError> {
     let req = client.get_object().bucket(bucket).key(key);
-
     let res = req.send().await?;
-
     Ok(res)
 }
 
 /// Read file from aws s3
-pub async fn read_file(client: Client, bucket: &str, key: &str) -> Result<Vec<u8>, UtilsError> {
+pub async fn read_file(client: &Client, bucket: &str, key: &str) -> Result<Vec<u8>, UtilsError> {
     let mut buf = Vec::new();
     let mut object = get_aws_object(client, bucket, key).await?;
     while let Some(bytes) = object.body.try_next().await? {
         buf.extend(bytes.to_vec());
     }
-
     Ok(buf)
 }
 
 /// Read parquet file to dataframe
 pub async fn read_file_to_df(
-    client: Client,
-    ctx: SessionContext,
+    client: &Client,
+    ctx: &SessionContext,
     bucket: &str,
     key: &str,
 ) -> Result<DataFrame, UtilsError> {
@@ -77,13 +74,12 @@ pub async fn read_file_to_df(
         .build()?;
     let batches = stream.try_collect::<Vec<_>>().await?;
     let res = ctx.read_batches(batches)?;
-
     Ok(res)
 }
 
 /// Read parquet file or dir from AWS S3 into dataframe
 pub async fn read_from_s3(
-    ctx: SessionContext,
+    ctx: &SessionContext,
     region: &str,
     bucket: &str,
     key: &str,
@@ -110,12 +106,11 @@ pub async fn read_from_s3(
     ctx.register_parquet("t", &path, ParquetReadOptions::default())
         .await?;
     let res = ctx.sql("select * from t").await?;
-
     Ok(res)
 }
 
 pub async fn write_to_s3(
-    ctx: SessionContext,
+    ctx: &SessionContext,
     bucket: &str,
     region: &str,
     key: &str,
@@ -151,13 +146,12 @@ pub async fn write_to_s3(
     let out_path = format!("s3://{bucket}/{key}");
     df.write_parquet(&out_path, DataFrameWriteOptions::new(), None)
         .await?;
-
     Ok(())
 }
 
 /// Write dataframe to aws s3 by chunk
 pub async fn write_df_to_s3(
-    client: Client,
+    client: &Client,
     bucket: &str,
     key: &str,
     df: DataFrame,
@@ -225,7 +219,7 @@ pub async fn write_df_to_s3(
 
 /// Write dataframe's record batches
 pub async fn write_batches_to_s3(
-    client: Client,
+    client: &Client,
     bucket: &str,
     key: &str,
     batches: Vec<RecordBatch>,
