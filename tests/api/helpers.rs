@@ -113,6 +113,13 @@ pub fn get_df3() -> Result<DataFrame> {
     Ok(ctx.read_batch(batch)?)
 }
 
+/// Get empty dataframe
+pub fn get_empty_df() -> Result<DataFrame> {
+    let ctx = SessionContext::new();
+    let df = ctx.read_empty()?;
+    Ok(df)
+}
+
 /// # Examples
 /// ```
 /// # use color_eyre::Result;

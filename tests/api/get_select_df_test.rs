@@ -7,10 +7,11 @@ use crate::helpers::*;
 use datafusion_example::utils::tools::*;
 
 #[rstest]
-#[case(get_df1()?, vec!["id", "name", "data"])]
-#[case(get_df2()?, vec!["id", "name"])]
-#[case(get_df3()?, vec!["id", "data"])]
-fn test_get_column_names(#[case] df: DataFrame, #[case] expected: Vec<&str>) -> Result<()> {
+#[case(get_df1()?, Some(vec!["id", "name", "data"]))]
+#[case(get_df2()?, Some(vec!["id", "name"]))]
+#[case(get_df3()?, Some(vec!["id", "data"]))]
+#[case(get_empty_df()?, None)]
+fn test_get_column_names(#[case] df: DataFrame, #[case] expected: Option<Vec<&str>>) -> Result<()> {
     assert_eq!(expected, get_column_names(&df));
     Ok(())
 }

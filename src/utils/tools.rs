@@ -387,13 +387,16 @@ pub fn select_all_exclude(df: DataFrame, to_exclude: &[&str]) -> Result<DataFram
     Ok(res)
 }
 
-/// Get dataframe columns names
-pub fn get_column_names(df: &DataFrame) -> Vec<&str> {
-    df.schema()
-        .fields()
+/// Returns column names if the schema is not empty.
+pub fn get_column_names(df: &DataFrame) -> Option<Vec<&str>> {
+    let fields = df.schema().fields();
+    if fields.is_empty() {
+        return None;
+    }
+    Some(fields
         .iter()
         .map(|col| col.name().as_str())
-        .collect::<Vec<_>>()
+        .collect::<Vec<_>>())
 }
 
 /// Concat arrays per column for dataframe
