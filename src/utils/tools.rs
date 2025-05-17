@@ -280,13 +280,38 @@ pub async fn add_col_to_df(
     data: ArrayRef,
     col_name: &str,
 ) -> Result<DataFrame, UtilsError> {
-    let schema = df.schema().as_arrow().clone();
-    let mut arrays = concat_arrays(df).await?;
-    let schema_new_col = Schema::new(vec![Field::new(col_name, data.data_type().clone(), true)]);
+    let schema_ref = Arc::new(df.schema().as_arrow().clone());
+    let mut arrays = concat_arrays(df).await?;         
+    let row_count = arrays.first()
+        .ok_or_else(|| DataFusionError::Execution("empty DataFrame".into()))?
+        .len();
+
+    if data.len() != row_count {
+        return Err(DataFusionError::Execution(
+            format!(
+                "new column '{col_name}' has length {}, expected {row_count}",
+                data.len()
+            ),
+        ).into());
+    }
+
     arrays.push(data);
-    let schema_new = Schema::try_merge(vec![schema, schema_new_col])?;
-    let batch = RecordBatch::try_new(Arc::new(schema_new), arrays)?;
-    let res = ctx.read_batch(batch)?;
+
+    let mut new_fields: Vec<Field> = schema_ref
+        .fields()
+        .iter()
+        .map(|f| f.as_ref().clone())
+        .collect();
+    let new_col_type = arrays
+        .last()
+        .expect("arrays should contain at least one column")
+        .data_type()
+        .clone();
+    new_fields.push(Field::new(col_name, new_col_type, true));
+    let new_schema = Arc::new(Schema::new(new_fields));
+
+    let final_batch = RecordBatch::try_new(new_schema, arrays)?;
+    let res = ctx.read_batch(final_batch)?;
     Ok(res)
 }
 
