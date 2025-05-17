@@ -148,12 +148,25 @@ pub async fn add_pk_to_df(
 ) -> Result<DataFrame, UtilsError> {
     let schema = df.schema().as_arrow().clone();
     let mut arrays = concat_arrays(df).await?;
-    let max_len = arrays.first().unwrap().len();
-    let pks: ArrayRef = Arc::new(Int32Array::from_iter(0..max_len as i32));
-    arrays.push(pks);
-    let schema_pks = Schema::new(vec![Field::new(col_name, DataType::Int32, true)]);
-    let schema_new = Schema::try_merge(vec![schema, schema_pks])?;
-    let batch = RecordBatch::try_new(Arc::new(schema_new), arrays)?;
+
+    let first_array = arrays.first().ok_or_else(|| {
+        DataFusionError::Execution("Cannot add PK to empty DataFrame".to_string())
+    })?;
+    let max_len = first_array.len();
+    debug_assert!(max_len <= i32::MAX as usize); 
+
+    let pk_array: ArrayRef = Arc::new(Int32Array::from_iter(0..max_len as i32));
+    arrays.push(pk_array);
+
+    let mut new_fields: Vec<Field> = schema
+        .fields()
+        .iter()
+        .map(|f| f.as_ref().clone())   
+        .collect();
+    new_fields.push(Field::new(col_name, DataType::Int32, false));
+    let new_schema = Arc::new(Schema::new(new_fields));
+
+    let batch = RecordBatch::try_new(new_schema, arrays)?;
     let res = ctx.read_batch(batch)?;
     Ok(res)
 }
