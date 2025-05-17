@@ -110,7 +110,12 @@ pub async fn query3() -> Result<()> {
 
 pub async fn query4() -> Result<()> {
     let ctx = SessionContext::new();
-    ctx.register_parquet("t", ".data/alltypes_plain.parquet", ParquetReadOptions::default()).await?;
+    ctx.register_parquet(
+        "t",
+        ".data/alltypes_plain.parquet",
+        ParquetReadOptions::default(),
+    )
+    .await?;
     let res = ctx.sql("select * from t").await?;
     res.show().await?;
     Ok(())
@@ -133,7 +138,7 @@ pub async fn view_example() -> Result<()> {
     )?;
     let ctx = SessionContext::new();
     let df = ctx.read_batch(batch)?;
-    
+
     let view = df.into_view();
     ctx.register_table("view", view)?;
     let res = ctx.sql("select * from view limit 1").await?;
@@ -158,8 +163,9 @@ pub async fn cte_example() -> Result<()> {
     )?;
     let ctx = SessionContext::new();
     ctx.register_batch("t", batch)?;
-    let res = ctx.sql("with tmp as (select * from t where data > 42) select count(*) from tmp").await?;
+    let res = ctx
+        .sql("with tmp as (select * from t where data > 42) select count(*) from tmp")
+        .await?;
     res.show().await?;
     Ok(())
 }
-

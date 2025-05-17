@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use color_eyre::Result;
-use datafusion::arrow::array::{AsArray, BinaryArray, Int32Array, RecordBatch, StringArray, Array};
+use datafusion::arrow::array::{Array, AsArray, BinaryArray, Int32Array, RecordBatch, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Int32Type, Schema};
 use datafusion::prelude::*;
 use itertools::izip;
@@ -36,10 +36,7 @@ impl Foo {
     pub async fn example1(ctx: &SessionContext) -> Result<()> {
         let schema = Self::schema();
         let data = Self::data();
-        let batch = RecordBatch::try_new(
-            Arc::new(schema),
-            data,
-        )?;
+        let batch = RecordBatch::try_new(Arc::new(schema), data)?;
         let df = ctx.read_batch(batch)?;
 
         let mut stream = df.execute_stream().await?;
@@ -64,10 +61,7 @@ impl Foo {
     pub async fn example2(ctx: &SessionContext) -> Result<()> {
         let schema = Self::schema();
         let data = Self::data();
-        let batch = RecordBatch::try_new(
-            Arc::new(schema),
-            data,
-        )?;
+        let batch = RecordBatch::try_new(Arc::new(schema), data)?;
         let df = ctx.read_batch(batch)?;
 
         let mut stream = df.execute_stream().await?;

@@ -7,8 +7,10 @@ use datafusion::arrow::array::{
 };
 use datafusion::arrow::compute::concat;
 use datafusion::arrow::datatypes::{ArrowPrimitiveType, ByteArrayType, DataType, Field, Schema};
+use datafusion::arrow::error::ArrowError;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::datasource::{MemTable, ViewTable};
+use datafusion::error::DataFusionError;
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::prelude::*;
 use futures_util::TryStreamExt;
@@ -377,7 +379,7 @@ pub async fn add_col_arr_to_df(
 /// ```
 pub fn select_all_exclude(df: DataFrame, to_exclude: &[&str]) -> Result<DataFrame, UtilsError> {
     let schema = df.schema().clone();
-    let columns= schema
+    let columns = schema
         .fields()
         .iter()
         .map(|x| x.name().as_str())
@@ -393,10 +395,12 @@ pub fn get_column_names(df: &DataFrame) -> Option<Vec<&str>> {
     if fields.is_empty() {
         return None;
     }
-    Some(fields
-        .iter()
-        .map(|col| col.name().as_str())
-        .collect::<Vec<_>>())
+    Some(
+        fields
+            .iter()
+            .map(|col| col.name().as_str())
+            .collect::<Vec<_>>(),
+    )
 }
 
 /// Concat arrays per column for dataframe
@@ -470,34 +474,52 @@ pub async fn df_cols_to_json(
     cols: &[&str],
     new_col: &str,
 ) -> Result<DataFrame, UtilsError> {
-    let schema = df.schema().as_arrow().to_owned();
-    let schema_ref = Arc::new(schema);
-    let mut arrays = concat_arrays(df).await?;
-    let batch = RecordBatch::try_new(schema_ref.clone(), arrays.clone())?;
-    let df_prepared = ctx.read_batch(batch)?;
-    let batches = df_prepared.select_columns(cols)?.collect().await?;
-    let buf = Vec::new();
-    let mut writer = arrow_json::ArrayWriter::new(buf);
-    for batch in batches {
-        writer.write(&batch)?;
-    }
+    let schema_ref = Arc::new(df.schema().as_arrow().clone());
+    let arrays = concat_arrays(df).await?;
+    let batch = RecordBatch::try_new(schema_ref.clone(), arrays)?;
+
+    let selected_arrays: Vec<ArrayRef> = cols
+        .iter()
+        .map(|col| {
+            batch
+                .column_by_name(col)
+                .ok_or_else(|| DataFusionError::Plan(format!("column {col} not found")))
+                .cloned()
+        })
+        .collect::<Result<_, _>>()?;
+
+    let selected_fields: Vec<Field> = cols
+        .iter()
+        .map(|col| schema_ref.field_with_name(col).cloned())
+        .collect::<Result<_, _>>()?;
+
+    let selected_schema = Arc::new(Schema::new(selected_fields));
+    let selected_batch = RecordBatch::try_new(selected_schema.clone(), selected_arrays)?;
+
+    let mut writer = arrow_json::ArrayWriter::new(Vec::new());
+    writer.write(&selected_batch)?;
     writer.finish()?;
 
     let json_data = writer.into_inner();
     let json_rows: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice())?;
     let str_rows: Vec<String> = json_rows
         .iter()
-        .map(|row| serde_json::to_string(row))   
-        .collect::<Result<_, _>>()?;  
+        .map(|row| serde_json::to_string(row))
+        .collect::<Result<_, _>>()?;
 
-    let new_col_arr: ArrayRef = Arc::new(StringArray::from(str_rows));
-    arrays.push(new_col_arr);
+    let mut all_columns = batch.columns().to_vec();
+    all_columns.push(Arc::new(StringArray::from(str_rows)) as ArrayRef);
 
-    let schema_new_col = Schema::new(vec![Field::new(new_col, DataType::Utf8, true)]);
-    let schema_new = Schema::try_merge(vec![schema_ref.as_ref().clone(), schema_new_col])?;
-    let batch = RecordBatch::try_new(Arc::new(schema_new), arrays)?;
-    let res = ctx.read_batch(batch)?;
-    let res = res.drop_columns(cols)?;
+    let mut new_fields: Vec<Field> = schema_ref
+        .fields()
+        .iter()
+        .map(|f| f.as_ref().clone())
+        .collect();
+    new_fields.push(Field::new(new_col, DataType::Utf8, true));
+    let new_schema = Arc::new(Schema::new(new_fields));
+
+    let new_batch = RecordBatch::try_new(new_schema, all_columns)?;
+    let res = ctx.read_batch(new_batch)?.drop_columns(cols)?;
     Ok(res)
 }
 
@@ -540,28 +562,46 @@ pub async fn df_cols_to_struct(
     cols: &[&str],
     new_col: &str,
 ) -> Result<DataFrame, UtilsError> {
-    let schema = df.schema().as_arrow().to_owned();
-    let schema_ref = Arc::new(schema);
-    let mut arrays = concat_arrays(df).await?;
-    let batch = RecordBatch::try_new(schema_ref.clone(), arrays.clone())?;
-    let mut struct_array_data = vec![];
-    for col in cols {
-        let field = schema_ref.field_with_name(col)?.clone();
-        let arr = batch.column_by_name(col).unwrap().clone();
-        struct_array_data.push((Arc::new(field), arr));
-    }
-    let df_struct = ctx.read_batch(batch)?.select_columns(cols)?;
-    let fields = df_struct.schema().clone().as_arrow().fields().clone();
-    let struct_array = StructArray::from(struct_array_data);
-    let struct_array_schema =
-        Schema::new(vec![Field::new(new_col, DataType::Struct(fields), true)]);
-    let schema = schema_ref.as_ref().clone();
-    let schema_new = Schema::try_merge(vec![schema, struct_array_schema])?;
-    arrays.push(Arc::new(struct_array));
-    let batch_with_struct = RecordBatch::try_new(Arc::new(schema_new), arrays)?;
+    let schema_ref = Arc::new(df.schema().as_arrow().clone());
+    let arrays = concat_arrays(df).await?;
+    let batch = RecordBatch::try_new(schema_ref.clone(), arrays)?;
 
-    let res = ctx.read_batch(batch_with_struct)?;
-    let res = res.drop_columns(cols)?;
+    let struct_array_data: Vec<_> = cols
+        .iter()
+        .map(|col| {
+            let field = schema_ref.field_with_name(col)?.clone();
+            let arr = batch
+                .column_by_name(col)
+                .ok_or_else(|| DataFusionError::Plan(format!("column {col} not found")))?
+                .clone();
+            Ok((Arc::new(field), arr))
+        })
+        .collect::<Result<_, DataFusionError>>()?;
+    let struct_array = StructArray::from(struct_array_data);
+
+    let mut new_columns = batch.columns().to_vec();
+    new_columns.push(Arc::new(struct_array));
+
+    let mut new_fields: Vec<Field> = schema_ref
+        .fields()
+        .iter()
+        .map(|f| f.as_ref().clone())
+        .collect();
+
+    let struct_fields: Vec<Field> = cols
+        .iter()
+        .map(|c| schema_ref.field_with_name(c).cloned())
+        .collect::<Result<_, ArrowError>>()?;
+
+    new_fields.push(Field::new(
+        new_col,
+        DataType::Struct(struct_fields.into()),
+        true,
+    ));
+    let merged_schema = Arc::new(Schema::new(new_fields));
+
+    let final_batch = RecordBatch::try_new(merged_schema, new_columns)?;
+    let res = ctx.read_batch(final_batch)?.drop_columns(cols)?;
     Ok(res)
 }
 

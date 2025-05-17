@@ -33,7 +33,7 @@ fn get_foos() -> Vec<Foo> {
 impl Foo {
     fn schema() -> Schema {
         Schema::new(vec![
-            Field::new("id", DataType::Int32, true), 
+            Field::new("id", DataType::Int32, true),
             Field::new("name", DataType::Utf8, true),
         ])
     }
@@ -41,7 +41,10 @@ impl Foo {
     fn to_record_batch(records: &[Self]) -> Result<RecordBatch> {
         let schema = Foo::schema();
         let ids = records.iter().map(|r| r.id).collect::<Vec<_>>();
-        let names = records.iter().map(|r| r.name.as_deref()).collect::<Vec<_>>();
+        let names = records
+            .iter()
+            .map(|r| r.name.as_deref())
+            .collect::<Vec<_>>();
 
         Ok(RecordBatch::try_new(
             Arc::new(schema),
@@ -54,10 +57,7 @@ impl Foo {
 }
 
 impl Foo {
-    pub async fn to_df(
-        ctx: &SessionContext, 
-        records: &[Self],
-    ) -> Result<DataFrame> {
+    pub async fn to_df(ctx: &SessionContext, records: &[Self]) -> Result<DataFrame> {
         let batch = Self::to_record_batch(records)?;
         let df = ctx.read_batch(batch)?;
         Ok(df)

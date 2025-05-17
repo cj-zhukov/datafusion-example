@@ -31,7 +31,7 @@ pub enum ScalarValueNew {
 
 macro_rules! typed_cast {
     ($array:expr, $index:expr, $ARRAYTYPE:ident, $SCALAR:ident) => {{
-    // ($array:expr_2021, $index:expr_2021, $ARRAYTYPE:ident, $SCALAR:ident) => {{
+        // ($array:expr_2021, $index:expr_2021, $ARRAYTYPE:ident, $SCALAR:ident) => {{
         let array = $array.as_any().downcast_ref::<$ARRAYTYPE>().unwrap();
         ScalarValueNew::$SCALAR(match array.is_null($index) {
             true => None,

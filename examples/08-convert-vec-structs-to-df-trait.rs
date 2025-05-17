@@ -36,7 +36,7 @@ fn get_foos() -> Vec<Foo> {
 impl Foo {
     fn schema() -> Schema {
         Schema::new(vec![
-            Field::new("id", DataType::Int32, true), 
+            Field::new("id", DataType::Int32, true),
             Field::new("name", DataType::Utf8, true),
         ])
     }
@@ -49,7 +49,10 @@ impl<'a> TryFrom<FooBatch<'a>> for RecordBatch {
         let records = batch.0;
         let schema = Foo::schema();
         let ids = records.iter().map(|r| r.id).collect::<Vec<_>>();
-        let names = records.iter().map(|r| r.name.as_deref()).collect::<Vec<_>>();
+        let names = records
+            .iter()
+            .map(|r| r.name.as_deref())
+            .collect::<Vec<_>>();
 
         Ok(RecordBatch::try_new(
             Arc::new(schema),
@@ -62,10 +65,7 @@ impl<'a> TryFrom<FooBatch<'a>> for RecordBatch {
 }
 
 impl Foo {
-    pub async fn to_df(
-        ctx: &SessionContext, 
-        records: &[Self],
-    ) -> Result<DataFrame> {
+    pub async fn to_df(ctx: &SessionContext, records: &[Self]) -> Result<DataFrame> {
         let batch = RecordBatch::try_from(FooBatch(records))?;
         let df = ctx.read_batch(batch)?;
         Ok(df)

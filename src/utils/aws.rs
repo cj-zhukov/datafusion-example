@@ -1,13 +1,13 @@
 use std::io::Cursor;
 use std::sync::Arc;
 
-use aws_config::{retry::RetryConfig, BehaviorVersion, Region};
+use aws_config::{BehaviorVersion, Region, retry::RetryConfig};
+use aws_sdk_s3::Client;
 use aws_sdk_s3::config::Builder;
 use aws_sdk_s3::operation::create_multipart_upload::CreateMultipartUploadOutput;
 use aws_sdk_s3::operation::get_object::GetObjectOutput;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
-use aws_sdk_s3::Client;
 use awscreds::Credentials;
 use color_eyre::eyre::ContextCompat;
 use datafusion::arrow::array::RecordBatch;
