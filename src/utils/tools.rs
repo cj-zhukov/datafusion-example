@@ -376,14 +376,14 @@ pub async fn add_col_arr_to_df(
 /// // +----+
 /// ```
 pub fn select_all_exclude(df: DataFrame, to_exclude: &[&str]) -> Result<DataFrame, UtilsError> {
-    let columns = df
-        .schema()
+    let schema = df.schema().clone();
+    let columns= schema
         .fields()
         .iter()
         .map(|x| x.name().as_str())
-        .filter(|x| !to_exclude.iter().any(|col| col.eq(x)))
+        .filter(|name| !to_exclude.contains(name))
         .collect::<Vec<_>>();
-    let res = df.clone().select_columns(&columns)?;
+    let res = df.select_columns(&columns)?;
     Ok(res)
 }
 
