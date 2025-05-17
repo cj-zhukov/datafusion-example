@@ -442,7 +442,7 @@ pub async fn concat_dfs(
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 /// let id = Int32Array::from(vec![1, 2, 3]);
-/// let name = StringArray::from(vec!["foo", "bar", "baz"]);
+/// let name = StringArray::from(vec![Some("foo"), Some("bar"), None]);
 /// let data = Int32Array::from(vec![42, 43, 44]);
 /// let df = df!("id" => id, "name" => name, "data" => data);
 /// // +----+------+------+
@@ -459,7 +459,7 @@ pub async fn concat_dfs(
 /// // +----+--------------------------+,
 /// // | 1  | {"data":42,"name":"foo"} |,
 /// // | 2  | {"data":43,"name":"bar"} |,
-/// // | 3  | {"data":44,"name":"baz"} |,
+/// // | 3  | {"data":44}              |,
 /// // +----+--------------------------+,
 /// # Ok(())
 /// # }
@@ -482,26 +482,19 @@ pub async fn df_cols_to_json(
         writer.write(&batch)?;
     }
     writer.finish()?;
+
     let json_data = writer.into_inner();
     let json_rows: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice())?;
-
-    let mut str_rows = vec![];
-    for json_row in &json_rows {
-        let str_row = if !json_rows.is_empty() {
-            let str_row = serde_json::to_string(&json_row)?;
-            Some(str_row)
-        } else {
-            None
-        };
-        str_rows.push(str_row);
-    }
+    let str_rows: Vec<String> = json_rows
+        .iter()
+        .map(|row| serde_json::to_string(row))   
+        .collect::<Result<_, _>>()?;  
 
     let new_col_arr: ArrayRef = Arc::new(StringArray::from(str_rows));
     arrays.push(new_col_arr);
 
     let schema_new_col = Schema::new(vec![Field::new(new_col, DataType::Utf8, true)]);
-    let schema = schema_ref.as_ref().clone();
-    let schema_new = Schema::try_merge(vec![schema, schema_new_col])?;
+    let schema_new = Schema::try_merge(vec![schema_ref.as_ref().clone(), schema_new_col])?;
     let batch = RecordBatch::try_new(Arc::new(schema_new), arrays)?;
     let res = ctx.read_batch(batch)?;
     let res = res.drop_columns(cols)?;
@@ -530,7 +523,6 @@ pub async fn df_cols_to_json(
 /// // | 3  | baz  | 44   |
 /// // +----+------+------+
 /// let ctx = SessionContext::new();
-/// //
 /// let res = df_cols_to_struct(&ctx, df, &["name", "data"], "new_col").await;
 /// // +----+-----------------------+
 /// // | id | new_col               |
