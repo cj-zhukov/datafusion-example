@@ -4,6 +4,7 @@ use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{Field, Schema};
 use datafusion::prelude::*;
 
+/// Converts a vector into an ArrayRef
 pub trait IntoArrayRef {
     fn into_array_ref(self: Box<Self>) -> ArrayRef;
 }
@@ -44,6 +45,21 @@ impl IntoArrayRef for Vec<Option<bool>> {
     }
 }
 
+/// Helper for creating dataframe
+/// # Examples
+/// ```
+/// # use datafusion_example::utils::conversions::df_from_columns;
+/// let id = Box::new(vec![1, 2, 3]);
+/// let name = Box::new(vec!["foo", "bar", "baz"]);
+/// let df = df_from_columns(vec![("id", id), ("name", name)]);
+/// // +----+------+,
+/// // | id | name |,
+/// // +----+------+,
+/// // | 1  | foo  |,
+/// // | 2  | bar  |,
+/// // | 3  | baz  |,
+/// // +----+------+,
+/// ```
 pub fn df_from_columns(columns: Vec<(&str, Box<dyn IntoArrayRef>)>) -> DataFrame {
     let mut fields = vec![];
     let mut arrays: Vec<ArrayRef> = vec![];
@@ -61,8 +77,7 @@ pub fn df_from_columns(columns: Vec<(&str, Box<dyn IntoArrayRef>)>) -> DataFrame
     );
 
     let schema = Arc::new(Schema::new(fields));
-    let batch = RecordBatch::try_new(schema.clone(), arrays)
-        .expect("failed creating batch");
+    let batch = RecordBatch::try_new(schema.clone(), arrays).expect("failed creating batch");
     let ctx = SessionContext::new();
     ctx.read_batch(batch).expect("failed reading batch")
 }

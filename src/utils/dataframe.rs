@@ -25,9 +25,9 @@ use crate::error::UtilsError;
 /// Query dataframe with sql
 /// # Examples
 /// ```
-/// # use datafusion_example::{df, utils::tools::df_sql};
+/// # use datafusion_example::{df, utils::dataframe::df_sql};
 /// let df = df!(
-///     "id" => vec![1, 2, 3], 
+///     "id" => vec![1, 2, 3],
 ///     "name" => vec!["foo", "bar", "baz"]
 /// );
 /// // +----+------+,
@@ -63,11 +63,11 @@ pub async fn is_empty(df: DataFrame) -> Result<bool, UtilsError> {
 /// ```
 /// use datafusion::prelude::*;
 /// # use color_eyre::Result;
-/// # use datafusion_example::{df, utils::tools::add_pk_to_df};
+/// # use datafusion_example::{df, utils::dataframe::add_pk_to_df};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 /// let df = df!(
-///     "id" => vec![1, 2, 3], 
+///     "id" => vec![1, 2, 3],
 ///     "name" => vec!["foo", "bar", "baz"]
 /// );
 /// // +----+------+,
@@ -101,16 +101,12 @@ pub async fn add_pk_to_df(
         DataFusionError::Execution("Cannot add PK to empty DataFrame".to_string())
     })?;
     let max_len = first_array.len();
-    debug_assert!(max_len <= i32::MAX as usize); 
+    debug_assert!(max_len <= i32::MAX as usize);
 
     let pk_array: ArrayRef = Arc::new(Int32Array::from_iter(0..max_len as i32));
     arrays.push(pk_array);
 
-    let mut new_fields: Vec<Field> = schema
-        .fields()
-        .iter()
-        .map(|f| f.as_ref().clone())   
-        .collect();
+    let mut new_fields: Vec<Field> = schema.fields().iter().map(|f| f.as_ref().clone()).collect();
     new_fields.push(Field::new(col_name, DataType::Int32, false));
     let new_schema = Arc::new(Schema::new(new_fields));
 
@@ -204,7 +200,7 @@ where
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::StringArray;
-/// # use datafusion_example::{df, utils::tools::add_col_to_df};
+/// # use datafusion_example::{df, utils::dataframe::add_col_to_df};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 /// let df = df!("id" => vec![1, 2, 3]);
@@ -228,18 +224,18 @@ pub async fn add_col_to_df(
     col_name: &str,
 ) -> Result<DataFrame, UtilsError> {
     let schema_ref = Arc::new(df.schema().as_arrow().clone());
-    let mut arrays = concat_arrays(df).await?;         
-    let row_count = arrays.first()
+    let mut arrays = concat_arrays(df).await?;
+    let row_count = arrays
+        .first()
         .ok_or_else(|| DataFusionError::Execution("empty DataFrame".into()))?
         .len();
 
     if data.len() != row_count {
-        return Err(DataFusionError::Execution(
-            format!(
-                "new column '{col_name}' has length {}, expected {row_count}",
-                data.len()
-            ),
-        ).into());
+        return Err(DataFusionError::Execution(format!(
+            "new column '{col_name}' has length {}, expected {row_count}",
+            data.len()
+        ))
+        .into());
     }
 
     arrays.push(data);
@@ -268,7 +264,7 @@ pub async fn add_col_to_df(
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::StringArray;
-/// # use datafusion_example::{df, utils::tools::add_col_arr_to_df};
+/// # use datafusion_example::{df, utils::dataframe::add_col_arr_to_df};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 /// let df = df!("id" => vec![1, 2, 3]);
@@ -338,10 +334,10 @@ pub async fn add_col_arr_to_df(
 /// # Examples
 /// ```
 /// use datafusion::prelude::*;
-/// # use datafusion_example::{df, utils::tools::select_all_exclude};
+/// # use datafusion_example::{df, utils::dataframe::select_all_exclude};
 /// let df = df!(
-///     "id" => vec![1, 2, 3], 
-///     "name" => vec!["foo", "bar", "baz"], 
+///     "id" => vec![1, 2, 3],
+///     "name" => vec!["foo", "bar", "baz"],
 ///     "data" => vec![42, 43, 44]
 /// );
 /// // +----+------+------+
@@ -425,12 +421,12 @@ pub async fn concat_dfs(
 /// ```
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
-/// # use datafusion_example::{df, utils::tools::df_cols_to_json};
+/// # use datafusion_example::{df, utils::dataframe::df_cols_to_json};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 /// let df = df!(
-///     "id" => vec![1, 2, 3], 
-///     "name" => vec![Some("foo"), Some("bar"), None], 
+///     "id" => vec![1, 2, 3],
+///     "name" => vec![Some("foo"), Some("bar"), None],
 ///     "data" => vec![42, 43, 44]
 /// );
 /// // +----+------+------+
@@ -513,12 +509,12 @@ pub async fn df_cols_to_json(
 /// ```
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
-/// # use datafusion_example::{df, utils::tools::df_cols_to_struct};
+/// # use datafusion_example::{df, utils::dataframe::df_cols_to_struct};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 /// let df = df!(
-///     "id" => vec![1, 2, 3], 
-///     "name" => vec!["foo", "bar", "baz"], 
+///     "id" => vec![1, 2, 3],
+///     "name" => vec!["foo", "bar", "baz"],
 ///     "data" => vec![42, 43, 44]
 /// );
 /// // +----+------+------+

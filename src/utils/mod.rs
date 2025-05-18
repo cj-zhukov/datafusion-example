@@ -1,5 +1,4 @@
 pub mod aws;
-pub mod into_array_ref;
-pub mod macros;
+pub mod conversions;
+pub mod dataframe;
 pub mod scalarvalue;
-pub mod tools;

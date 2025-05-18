@@ -1,2 +1,2 @@
 # datafusion-example
-DataFusion utils, tools and examples in Rust
+DataFusion tools and examples in Rust

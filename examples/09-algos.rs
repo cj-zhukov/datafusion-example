@@ -4,7 +4,7 @@ use color_eyre::Result;
 use datafusion::arrow::array::{Float64Array, Int32Array, RecordBatch, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::prelude::*;
-use datafusion_example::utils::tools::df_to_table;
+use datafusion_example::utils::dataframe::df_to_table;
 
 #[tokio::main]
 async fn main() -> Result<()> {

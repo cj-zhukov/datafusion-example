@@ -8,8 +8,8 @@ use datafusion::arrow::compute::concat;
 use datafusion::arrow::datatypes::{DataType, Field, Float32Type, Int32Type, Schema};
 use datafusion::scalar::ScalarValue;
 use datafusion::{arrow, assert_batches_eq, prelude::*};
+use datafusion_example::utils::dataframe::df_to_table;
 use datafusion_example::utils::scalarvalue::parse_strings;
-use datafusion_example::utils::tools::df_to_table;
 use tokio_stream::StreamExt;
 
 #[tokio::main]
