@@ -22,66 +22,14 @@ use tokio_stream::StreamExt;
 
 use crate::error::UtilsError;
 
-/// Macro for creating dataframe, similar (almost) to polars
-/// # Examples
-/// ```
-/// use datafusion::arrow::array::{Int32Array, StringArray};
-/// # use datafusion_example::df;
-/// let id = Int32Array::from(vec![1, 2, 3]);
-/// let name = StringArray::from(vec!["foo", "bar", "baz"]);
-/// let df = df!(
-///    "id" => id,
-///    "name" => name
-///  );
-/// // +----+------+,
-/// // | id | name |,
-/// // +----+------+,
-/// // | 1  | foo  |,
-/// // | 2  | bar  |,
-/// // | 3  | baz  |,
-/// // +----+------+,
-/// ```
-#[macro_export]
-macro_rules! df {
-    () => {{
-        use datafusion::prelude::*;
-
-        let ctx = SessionContext::new();
-        ctx.read_empty().expect("failed creating empty dataframe")
-    }};
-
-    // ($($col_name:expr_2021 => $data:expr_2021),+) => {{ // #TODO expr_2021 vs expr
-    ($($col_name:expr => $data:expr),+) => {{
-        use datafusion::prelude::*;
-        use datafusion::arrow::array::{RecordBatch, ArrayRef};
-        use datafusion::arrow::datatypes::{Field, Schema};
-        use std::sync::Arc;
-
-        let mut fields = vec![];
-        let mut columns: Vec<ArrayRef> = vec![];
-
-        $(
-            let col = Arc::new($data) as ArrayRef;
-            let dtype = col.data_type().clone();
-            fields.push(Field::new($col_name, dtype, true));
-            columns.push(col);
-        )+
-
-        let schema = Arc::new(Schema::new(fields));
-        let batch = RecordBatch::try_new(schema, columns).expect("failed creating batch");
-        let ctx = SessionContext::new();
-        ctx.read_batch(batch).expect("failed creating dataframe")
-    }};
-}
-
 /// Query dataframe with sql
 /// # Examples
 /// ```
-/// use datafusion::arrow::array::{Int32Array, StringArray};
 /// # use datafusion_example::{df, utils::tools::df_sql};
-/// let id = Int32Array::from(vec![1, 2, 3]);
-/// let name = StringArray::from(vec!["foo", "bar", "baz"]);
-/// let df = df!("id" => id, "name" => name);
+/// let df = df!(
+///     "id" => vec![1, 2, 3], 
+///     "name" => vec!["foo", "bar", "baz"]
+/// );
 /// // +----+------+,
 /// // | id | name |,
 /// // +----+------+,
@@ -115,13 +63,13 @@ pub async fn is_empty(df: DataFrame) -> Result<bool, UtilsError> {
 /// ```
 /// use datafusion::prelude::*;
 /// # use color_eyre::Result;
-/// use datafusion::arrow::array::{Int32Array, StringArray};
 /// # use datafusion_example::{df, utils::tools::add_pk_to_df};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let id = Int32Array::from(vec![1, 2, 3]);
-/// let name = StringArray::from(vec!["foo", "bar", "baz"]);
-/// let df = df!("id" => id, "name" => name);
+/// let df = df!(
+///     "id" => vec![1, 2, 3], 
+///     "name" => vec!["foo", "bar", "baz"]
+/// );
 /// // +----+------+,
 /// // | id | name |,
 /// // +----+------+,
@@ -255,12 +203,11 @@ where
 /// use std::sync::Arc;
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
-/// use datafusion::arrow::array::{Int32Array, StringArray};
+/// use datafusion::arrow::array::StringArray;
 /// # use datafusion_example::{df, utils::tools::add_col_to_df};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let id = Int32Array::from(vec![1, 2, 3]);
-/// let df = df!("id" => id);
+/// let df = df!("id" => vec![1, 2, 3]);
 /// let name = StringArray::from(vec!["foo", "bar", "baz"]);
 /// let ctx = SessionContext::new();
 /// let res = add_col_to_df(&ctx, df, Arc::new(name), "name").await?;
@@ -320,12 +267,11 @@ pub async fn add_col_to_df(
 /// ```
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
-/// use datafusion::arrow::array::{Int32Array, StringArray};
+/// use datafusion::arrow::array::StringArray;
 /// # use datafusion_example::{df, utils::tools::add_col_arr_to_df};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let id = Int32Array::from(vec![1, 2, 3]);
-/// let df = df!("id" => id);
+/// let df = df!("id" => vec![1, 2, 3]);
 /// let name = StringArray::from(vec!["foo", "bar", "baz"]);
 /// let ctx = SessionContext::new();
 /// let res = add_col_arr_to_df(&ctx, df, &name, "name").await?;
@@ -392,12 +338,12 @@ pub async fn add_col_arr_to_df(
 /// # Examples
 /// ```
 /// use datafusion::prelude::*;
-/// use datafusion::arrow::array::{Int32Array, StringArray};
 /// # use datafusion_example::{df, utils::tools::select_all_exclude};
-/// let id = Int32Array::from(vec![1, 2, 3]);
-/// let name = StringArray::from(vec!["foo", "bar", "baz"]);
-/// let data = Int32Array::from(vec![42, 43, 44]);
-/// let df = df!("id" => id, "name" => name, "data" => data);
+/// let df = df!(
+///     "id" => vec![1, 2, 3], 
+///     "name" => vec!["foo", "bar", "baz"], 
+///     "data" => vec![42, 43, 44]
+/// );
 /// // +----+------+------+
 /// // | id | name | data |
 /// // +----+------+------+
@@ -479,14 +425,14 @@ pub async fn concat_dfs(
 /// ```
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
-/// use datafusion::arrow::array::{Int32Array, StringArray};
 /// # use datafusion_example::{df, utils::tools::df_cols_to_json};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let id = Int32Array::from(vec![1, 2, 3]);
-/// let name = StringArray::from(vec![Some("foo"), Some("bar"), None]);
-/// let data = Int32Array::from(vec![42, 43, 44]);
-/// let df = df!("id" => id, "name" => name, "data" => data);
+/// let df = df!(
+///     "id" => vec![1, 2, 3], 
+///     "name" => vec![Some("foo"), Some("bar"), None], 
+///     "data" => vec![42, 43, 44]
+/// );
 /// // +----+------+------+
 /// // | id | name | data |
 /// // +----+------+------+
@@ -567,14 +513,14 @@ pub async fn df_cols_to_json(
 /// ```
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
-/// use datafusion::arrow::array::{Int32Array, StringArray};
 /// # use datafusion_example::{df, utils::tools::df_cols_to_struct};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let id = Int32Array::from(vec![1, 2, 3]);
-/// let name = StringArray::from(vec!["foo", "bar", "baz"]);
-/// let data = Int32Array::from(vec![42, 43, 44]);
-/// let df = df!("id" => id, "name" => name, "data" => data);
+/// let df = df!(
+///     "id" => vec![1, 2, 3], 
+///     "name" => vec!["foo", "bar", "baz"], 
+///     "data" => vec![42, 43, 44]
+/// );
 /// // +----+------+------+
 /// // | id | name | data |
 /// // +----+------+------+

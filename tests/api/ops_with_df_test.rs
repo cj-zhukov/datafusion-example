@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use color_eyre::Result;
-use datafusion::arrow::array::{Array, Int32Array, RecordBatch, StringArray};
+use datafusion::arrow::array::RecordBatch;
 use datafusion::assert_batches_eq;
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::prelude::*;
@@ -14,14 +14,10 @@ use crate::helpers::{get_df1, get_schema};
 
 #[tokio::test]
 async fn test_df_macro() -> Result<()> {
-    let id = Int32Array::from(vec![1, 2, 3]);
-    let data = Int32Array::from(vec![42, 43, 44]);
-    let name = StringArray::from(vec![Some("foo"), Some("bar"), None]);
-
     let df = df!(
-        "id" => id,
-        "data" => data,
-        "name" => name
+        "id" => vec![1, 2, 3],
+        "data" => vec![42, 43, 44],
+        "name" => vec![Some("foo"), Some("bar"), None]
     );
 
     assert_eq!(df.schema().fields().len(), 3); // columns count
