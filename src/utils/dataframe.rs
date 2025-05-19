@@ -52,8 +52,8 @@ pub fn get_empty_df(ctx: &SessionContext) -> Result<DataFrame, UtilsError> {
 /// ```
 /// # use datafusion_example::{df, utils::dataframe::df_sql};
 /// let df = df!(
-///     "id" => vec![1, 2, 3],
-///     "name" => vec!["foo", "bar", "baz"]
+///     "id" => [1, 2, 3],
+///     "name" => ["foo", "bar", "baz"]
 /// );
 /// // +----+------+,
 /// // | id | name |,
@@ -93,8 +93,8 @@ pub async fn is_empty(df: DataFrame) -> Result<bool, UtilsError> {
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 /// let df = df!(
-///     "id" => vec![1, 2, 3],
-///     "name" => vec!["foo", "bar", "baz"]
+///     "id" => [1, 2, 3],
+///     "name" => ["foo", "bar", "baz"]
 /// );
 /// // +----+------+,
 /// // | id | name |,
@@ -229,7 +229,7 @@ where
 /// # use datafusion_example::{df, utils::dataframe::add_col_to_df};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = df!("id" => vec![1, 2, 3]);
+/// let df = df!("id" => [1, 2, 3]);
 /// let name = StringArray::from(vec!["foo", "bar", "baz"]);
 /// let ctx = SessionContext::new();
 /// let res = add_col_to_df(&ctx, df, Arc::new(name), "name").await?;
@@ -293,7 +293,7 @@ pub async fn add_col_to_df(
 /// # use datafusion_example::{df, utils::dataframe::add_col_arr_to_df};
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = df!("id" => vec![1, 2, 3]);
+/// let df = df!("id" => [1, 2, 3]);
 /// let name = StringArray::from(vec!["foo", "bar", "baz"]);
 /// let ctx = SessionContext::new();
 /// let res = add_col_arr_to_df(&ctx, df, &name, "name").await?;
@@ -362,9 +362,9 @@ pub async fn add_col_arr_to_df(
 /// use datafusion::prelude::*;
 /// # use datafusion_example::{df, utils::dataframe::select_all_exclude};
 /// let df = df!(
-///     "id" => vec![1, 2, 3],
-///     "name" => vec!["foo", "bar", "baz"],
-///     "data" => vec![42, 43, 44]
+///     "id" => [1, 2, 3],
+///     "name" => ["foo", "bar", "baz"],
+///     "data" => [42, 43, 44]
 /// );
 /// // +----+------+------+
 /// // | id | name | data |
@@ -451,9 +451,9 @@ pub async fn concat_dfs(
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 /// let df = df!(
-///     "id" => vec![1, 2, 3],
-///     "name" => vec![Some("foo"), Some("bar"), None],
-///     "data" => vec![42, 43, 44]
+///     "id" => [1, 2, 3],
+///     "name" => [Some("foo"), Some("bar"), None],
+///     "data" => [42, 43, 44]
 /// );
 /// // +----+------+------+
 /// // | id | name | data |
@@ -539,9 +539,9 @@ pub async fn df_cols_to_json(
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 /// let df = df!(
-///     "id" => vec![1, 2, 3],
-///     "name" => vec!["foo", "bar", "baz"],
-///     "data" => vec![42, 43, 44]
+///     "id" => [1, 2, 3],
+///     "name" => ["foo", "bar", "baz"],
+///     "data" => [42, 43, 44]
 /// );
 /// // +----+------+------+
 /// // | id | name | data |

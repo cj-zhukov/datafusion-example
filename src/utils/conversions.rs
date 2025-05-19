@@ -21,6 +21,18 @@ impl IntoArrayRef for Vec<Option<i32>> {
     }
 }
 
+impl<const N: usize> IntoArrayRef for [i32; N] {
+    fn into_array_ref(self: Box<Self>) -> ArrayRef {
+        Arc::new(Int32Array::from(Vec::from(*self)))
+    }
+}
+
+impl<const N: usize> IntoArrayRef for [Option<i32>; N] {
+    fn into_array_ref(self: Box<Self>) -> ArrayRef {
+        Arc::new(Int32Array::from(Vec::from(*self)))
+    }
+}
+
 impl IntoArrayRef for Vec<&str> {
     fn into_array_ref(self: Box<Self>) -> ArrayRef {
         Arc::new(StringArray::from(*self))
@@ -33,6 +45,18 @@ impl IntoArrayRef for Vec<Option<&str>> {
     }
 }
 
+impl<const N: usize> IntoArrayRef for [&'static str; N] {
+    fn into_array_ref(self: Box<Self>) -> ArrayRef {
+        Arc::new(StringArray::from(Vec::from(*self)))
+    }
+}
+
+impl<const N: usize> IntoArrayRef for [Option<&'static str>; N] {
+    fn into_array_ref(self: Box<Self>) -> ArrayRef {
+        Arc::new(StringArray::from(Vec::from(*self)))
+    }
+}
+
 impl IntoArrayRef for Vec<bool> {
     fn into_array_ref(self: Box<Self>) -> ArrayRef {
         Arc::new(BooleanArray::from(*self))
@@ -42,6 +66,18 @@ impl IntoArrayRef for Vec<bool> {
 impl IntoArrayRef for Vec<Option<bool>> {
     fn into_array_ref(self: Box<Self>) -> ArrayRef {
         Arc::new(BooleanArray::from(*self))
+    }
+}
+
+impl<const N: usize> IntoArrayRef for [bool; N] {
+    fn into_array_ref(self: Box<Self>) -> ArrayRef {
+        Arc::new(BooleanArray::from(Vec::from(*self)))
+    }
+}
+
+impl<const N: usize> IntoArrayRef for [Option<bool>; N] {
+    fn into_array_ref(self: Box<Self>) -> ArrayRef {
+        Arc::new(BooleanArray::from(Vec::from(*self)))
     }
 }
 

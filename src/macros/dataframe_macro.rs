@@ -3,6 +3,11 @@
 /// ```
 /// # use datafusion_example::df;
 /// let df = df!(
+///    "id" => [1, 2, 3],
+///    "name" => ["foo", "bar", "baz"]
+///  );
+/// // or using vectors
+/// let df = df!(
 ///    "id" => vec![1, 2, 3],
 ///    "name" => vec!["foo", "bar", "baz"]
 ///  );
