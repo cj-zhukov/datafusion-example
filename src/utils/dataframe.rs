@@ -22,6 +22,31 @@ use tokio_stream::StreamExt;
 
 use crate::error::UtilsError;
 
+/// Get empty dataframe
+/// # Examples
+/// ```
+/// # use color_eyre::Result;
+/// use datafusion::prelude::*;
+/// # use datafusion_example::{utils::dataframe::get_empty_df};
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
+/// let ctx = SessionContext::new();
+/// let df = get_empty_df(&ctx)?;
+/// assert_eq!(df.schema().fields().len(), 0); // columns count
+/// assert_eq!(df.count().await?, 0); // rows count
+/// // note, this is different:
+/// let df = ctx.read_empty()?;
+/// assert_eq!(df.schema().fields().len(), 0); // columns count
+/// assert_eq!(df.count().await?, 1); // rows count
+/// # Ok(())
+/// # }
+/// ```
+pub fn get_empty_df(ctx: &SessionContext) -> Result<DataFrame, UtilsError> {
+    let batch = RecordBatch::new_empty(Arc::new(Schema::empty()));
+    let df = ctx.read_batch(batch)?;
+    Ok(df)
+}
+
 /// Query dataframe with sql
 /// # Examples
 /// ```
@@ -53,9 +78,10 @@ pub async fn df_sql(df: DataFrame, sql: &str) -> Result<DataFrame, UtilsError> {
 
 /// Check if dataframe is empty and doesn't have rows
 pub async fn is_empty(df: DataFrame) -> Result<bool, UtilsError> {
+    let is_empty_schema = df.schema().fields().is_empty();
     let batches = df.collect().await?;
     let is_empty = batches.iter().all(|batch| batch.num_rows() == 0);
-    Ok(is_empty)
+    Ok(is_empty && is_empty_schema)
 }
 
 /// Add auto-increment column to dataframe

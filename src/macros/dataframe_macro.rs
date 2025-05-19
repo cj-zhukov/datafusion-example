@@ -13,14 +13,22 @@
 /// // | 2  | bar  |,
 /// // | 3  | baz  |,
 /// // +----+------+,
+/// let df = df!(); // empty df
+/// //++
+/// //++
 /// ```
 #[macro_export]
 macro_rules! df {
     () => {{
+        use std::sync::Arc;
+
         use datafusion::prelude::*;
+        use datafusion::arrow::array::RecordBatch;
+        use datafusion::arrow::datatypes::Schema;
 
         let ctx = SessionContext::new();
-        ctx.read_empty().expect("failed creating empty dataframe")
+        let batch = RecordBatch::new_empty(Arc::new(Schema::empty()));
+        ctx.read_batch(batch).expect("failed creating empty dataframe")
     }};
 
     ($($col_name:expr => $data:expr),+ $(,)?) => {{

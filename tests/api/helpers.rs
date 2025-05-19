@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use datafusion_example::utils::dataframe::get_empty_df;
+
 use color_eyre::Result;
 use datafusion::{
     arrow::{
@@ -113,28 +115,8 @@ pub fn get_df3() -> Result<DataFrame> {
     Ok(ctx.read_batch(batch)?)
 }
 
-/// Get empty dataframe
-pub fn get_empty_df() -> Result<DataFrame> {
+pub fn get_empty_dataframe() -> Result<DataFrame> {
     let ctx = SessionContext::new();
-    let df = ctx.read_empty()?;
+    let df = get_empty_df(&ctx)?;
     Ok(df)
-}
-
-/// # Examples
-/// ```
-/// # use color_eyre::Result;
-/// # fn main() -> Result<()> {
-/// let df = get_schema()?;
-/// // id Int32
-/// // name Utf8
-/// // data Int32
-/// # Ok(())
-/// # }
-/// ```
-pub fn get_schema() -> Schema {
-    Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, true),
-        Field::new("data", DataType::Int32, true),
-    ])
 }

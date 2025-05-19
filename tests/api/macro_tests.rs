@@ -31,3 +31,11 @@ async fn test_df_macro() -> Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_df_macro_empty() -> Result<()> {
+    let df = df!();
+    assert_eq!(df.schema().fields().len(), 0); // columns count
+    assert_eq!(df.clone().count().await?, 0); // rows count
+    Ok(())
+}

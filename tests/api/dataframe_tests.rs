@@ -366,7 +366,7 @@ async fn test_add_col_arr_to_df() -> Result<()> {
 #[case(get_df1()?, Some(vec!["id", "name", "data"]))]
 #[case(get_df2()?, Some(vec!["id", "name"]))]
 #[case(get_df3()?, Some(vec!["id", "data"]))]
-#[case(get_empty_df()?, None)]
+#[case(get_empty_dataframe()?, None)]
 fn test_get_column_names(#[case] df: DataFrame, #[case] expected: Option<Vec<&str>>) -> Result<()> {
     assert_eq!(expected, get_column_names(&df));
     Ok(())
@@ -427,10 +427,23 @@ async fn test_is_empty() -> Result<()> {
     let df = get_df1()?;
     assert_eq!(is_empty(df).await?, false);
 
-    let schema = get_schema();
+    let df = ctx.read_empty()?;
+    assert_eq!(is_empty(df).await?, false);
+
+    let schema = Schema::empty();
     let batch = RecordBatch::new_empty(Arc::new(schema));
     let df = ctx.read_batch(batch)?;
     assert_eq!(is_empty(df).await?, true);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_empty_df() -> Result<()> {
+    let ctx = SessionContext::new();
+    let df = get_empty_df(&ctx)?;
+    assert_eq!(df.schema().fields().len(), 0);
+    assert_eq!(df.clone().count().await?, 0);
 
     Ok(())
 }
