@@ -655,7 +655,7 @@ pub async fn df_to_table(
     df: DataFrame,
     table_name: &str,
 ) -> Result<(), UtilsError> {
-    let schema = df.clone().schema().as_arrow().clone();
+    let schema = df.schema().as_arrow().clone();
     let batches = df.collect().await?;
     let mem_table = MemTable::try_new(Arc::new(schema), vec![batches])?;
     ctx.register_table(table_name, Arc::new(mem_table))?;
