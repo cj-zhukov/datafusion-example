@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+arrow = "55"
 arrow-json = "55"
 aws-config = "1.6.2"
 aws-sdk-s3 = "1.83"

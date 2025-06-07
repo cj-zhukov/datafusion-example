@@ -4,6 +4,11 @@ use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{Field, Schema};
 use datafusion::prelude::*;
 
+use datafusion::common::create_array;
+use arrow::array::Array;
+
+use crate::error::UtilsError;
+
 /// Converts a vector into an ArrayRef
 pub trait IntoArrayRef {
     fn into_array_ref(self: Box<Self>) -> ArrayRef;
@@ -81,13 +86,60 @@ impl<const N: usize> IntoArrayRef for [Option<bool>; N] {
     }
 }
 
+// -- new
+pub trait IntoArrayRefNew {
+    fn into_array_ref_new(self) -> ArrayRef;
+}
+// -- i32
+impl IntoArrayRefNew for Vec<i32> {
+    fn into_array_ref_new(self) -> ArrayRef {
+        create_array!(Int32, self)
+    }
+}
+
+impl IntoArrayRefNew for Vec<Option<i32>> {
+    fn into_array_ref_new(self) -> ArrayRef {
+        create_array!(Int32, self)
+    }
+}
+
+impl IntoArrayRefNew for &[i32] {
+    fn into_array_ref_new(self) -> ArrayRef {
+        create_array!(Int32, self.to_vec())
+    }
+}
+
+impl IntoArrayRefNew for &[Option<i32>] {
+    fn into_array_ref_new(self) -> ArrayRef {
+        create_array!(Int32, self.to_vec())
+    }
+}
+// -- str
+impl IntoArrayRefNew for Vec<&str> {
+    fn into_array_ref_new(self) -> ArrayRef {
+        create_array!(Utf8, self)
+    }
+}
+
+impl IntoArrayRefNew for Vec<Option<&str>> {
+    fn into_array_ref_new(self) -> ArrayRef {
+        create_array!(Utf8, self)
+    }
+}
+
+impl<const N: usize> IntoArrayRefNew for [&str; N] {
+    fn into_array_ref_new(self) -> ArrayRef {
+        create_array!(Utf8, self.to_vec())
+    }
+}
+
 /// Helper for creating dataframe
 /// # Examples
 /// ```
 /// # use datafusion_example::utils::conversions::df_from_columns;
-/// let id = Box::new(vec![1, 2, 3]);
-/// let name = Box::new(vec!["foo", "bar", "baz"]);
-/// let df = df_from_columns(vec![("id", id), ("name", name)]);
+/// let id = Box::new([1, 2, 3]); 
+/// let name = Box::new(["foo", "bar", "baz"]);
+/// let df = df_from_columns(vec![("id", id), ("name", name)]).unwrap();
 /// // +----+------+,
 /// // | id | name |,
 /// // +----+------+,
@@ -96,8 +148,8 @@ impl<const N: usize> IntoArrayRef for [Option<bool>; N] {
 /// // | 3  | baz  |,
 /// // +----+------+,
 /// ```
-pub fn df_from_columns(columns: Vec<(&str, Box<dyn IntoArrayRef>)>) -> DataFrame {
-    let mut fields = vec![];
+pub fn df_from_columns(columns: Vec<(&str, Box<dyn IntoArrayRef>)>) -> Result<DataFrame, UtilsError> {
+    let mut fields: Vec<Field> = vec![];
     let mut arrays: Vec<ArrayRef> = vec![];
 
     for (name, array_like) in columns {
@@ -113,7 +165,45 @@ pub fn df_from_columns(columns: Vec<(&str, Box<dyn IntoArrayRef>)>) -> DataFrame
     );
 
     let schema = Arc::new(Schema::new(fields));
-    let batch = RecordBatch::try_new(schema.clone(), arrays).expect("failed creating batch");
+    let batch = RecordBatch::try_new(schema.clone(), arrays)?;
     let ctx = SessionContext::new();
-    ctx.read_batch(batch).expect("failed reading batch")
+    let df = ctx.read_batch(batch)?;
+    Ok(df)
+}
+
+/// Helper for creating dataframe
+/// # Examples
+/// ```
+/// # use datafusion_example::utils::conversions::dataframe_from_columns;
+/// use std::sync::Arc;
+/// use arrow::array::{Int32Array, StringArray, ArrayRef};
+/// let id: ArrayRef = Arc::new(Int32Array::from(vec![1, 2, 3])); 
+/// let name: ArrayRef = Arc::new(StringArray::from(vec!["foo", "bar", "baz"]));
+/// let df = dataframe_from_columns(vec![("id", id), ("name", name)]).unwrap();
+/// // +----+------+,
+/// // | id | name |,
+/// // +----+------+,
+/// // | 1  | foo  |,
+/// // | 2  | bar  |,
+/// // | 3  | baz  |,
+/// // +----+------+,
+/// ```
+pub fn dataframe_from_columns(
+    columns: Vec<(&str, ArrayRef)>
+) -> Result<DataFrame, UtilsError> {
+    let fields = columns
+        .iter()
+        .map(|(name, array)| Field::new(*name, array.data_type().clone(), true))
+        .collect::<Vec<_>>();
+
+    let arrays = columns
+        .into_iter()
+        .map(|(_, array)| array)
+        .collect::<Vec<_>>();
+
+    let schema = Arc::new(Schema::new(fields));
+    let batch = RecordBatch::try_new(schema, arrays)?;
+    let ctx = SessionContext::new();
+    let df = ctx.read_batch(batch)?;
+    Ok(df)
 }
