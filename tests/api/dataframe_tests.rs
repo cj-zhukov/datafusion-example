@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
+use arrow::array::Float64Array;
 use color_eyre::Result;
 use datafusion::arrow::array::{
-    Array, Float64Array, Int32Array, LargeStringArray, RecordBatch, StringArray,
+    Array, ArrayRef, Int32Array, RecordBatch, StringArray,
 };
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::assert_batches_eq;
@@ -129,33 +130,6 @@ async fn test_cols_to_struct() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_add_pk_to_df() -> Result<()> {
-    let df = get_df1()?;
-
-    let ctx = SessionContext::new();
-    let res = add_pk_to_df(&ctx, df, "pk").await?;
-
-    assert_eq!(res.schema().fields().len(), 4); // columns count
-    assert_eq!(res.clone().count().await?, 3); // rows count
-
-    let rows = res.sort(vec![col("id").sort(true, true)])?;
-    assert_batches_eq!(
-        &[
-            "+----+------+------+----+",
-            "| id | name | data | pk |",
-            "+----+------+------+----+",
-            "| 1  | foo  | 42   | 0  |",
-            "| 2  | bar  | 43   | 1  |",
-            "| 3  | baz  | 44   | 2  |",
-            "+----+------+------+----+",
-        ],
-        &rows.collect().await?
-    );
-
-    Ok(())
-}
-
-#[tokio::test]
 async fn test_concat_dfs() -> Result<()> {
     let ctx = SessionContext::new();
     let df1 = get_df1()?;
@@ -179,182 +153,6 @@ async fn test_concat_dfs() -> Result<()> {
             "| 3  | baz  | 44   |",
             "| 3  | baz  | 44   |",
             "+----+------+------+",
-        ],
-        &rows.collect().await?
-    );
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_add_int_col_to_df() -> Result<()> {
-    let ctx = SessionContext::new();
-    let df = get_df2()?;
-
-    let data = vec![42, 43, 44];
-    let res = add_int_col_to_df(&ctx, df, data, "data").await?;
-
-    assert_eq!(res.schema().fields().len(), 3); // columns count
-    assert_eq!(res.clone().count().await?, 3); // rows count
-
-    let rows = res.sort(vec![col("id").sort(true, true)])?;
-    assert_batches_eq!(
-        &[
-            "+----+------+------+",
-            "| id | name | data |",
-            "+----+------+------+",
-            "| 1  | foo  | 42   |",
-            "| 2  | bar  | 43   |",
-            "| 3  | baz  | 44   |",
-            "+----+------+------+",
-        ],
-        &rows.collect().await?
-    );
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_add_str_col_to_df() -> Result<()> {
-    let ctx = SessionContext::new();
-    let df = get_df3()?;
-
-    let data = vec!["foo", "bar", "baz"];
-    let res = add_str_col_to_df(&ctx, df, data, "name").await?;
-
-    assert_eq!(res.schema().fields().len(), 3); // columns count
-    assert_eq!(res.clone().count().await?, 3); // rows count
-
-    let rows = res.sort(vec![col("id").sort(true, true)])?;
-    assert_batches_eq!(
-        &[
-            "+----+------+------+",
-            "| id | data | name |",
-            "+----+------+------+",
-            "| 1  | 42   | foo  |",
-            "| 2  | 43   | bar  |",
-            "| 3  | 44   | baz  |",
-            "+----+------+------+",
-        ],
-        &rows.collect().await?
-    );
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_add_any_num_col_to_df() -> Result<()> {
-    let ctx = SessionContext::new();
-    let df = get_df3()?;
-
-    let data = vec![1, 2, 3];
-    let data_col = Int32Array::from(data);
-    let df = add_any_num_col_to_df(&ctx, df, data_col, "col1").await?;
-
-    let data = vec![1.1, 1.2, 1.3];
-    let data_col = Float64Array::from(data);
-    let res = add_any_num_col_to_df(&ctx, df, data_col, "col2").await?;
-
-    assert_eq!(res.schema().fields().len(), 4); // columns count
-    assert_eq!(res.clone().count().await?, 3); // rows count
-
-    let rows = res.sort(vec![col("id").sort(true, true)])?;
-    assert_batches_eq!(
-        &[
-            "+----+------+------+------+",
-            "| id | data | col1 | col2 |",
-            "+----+------+------+------+",
-            "| 1  | 42   | 1    | 1.1  |",
-            "| 2  | 43   | 2    | 1.2  |",
-            "| 3  | 44   | 3    | 1.3  |",
-            "+----+------+------+------+",
-        ],
-        &rows.collect().await?
-    );
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_add_any_str_col_to_df() -> Result<()> {
-    let ctx = SessionContext::new();
-    let df = get_df3()?;
-
-    let data = vec!["foo", "bar", "baz"];
-    let data_col = StringArray::from(data);
-    let df = add_any_str_col_to_df(&ctx, df, data_col, "col1").await?;
-
-    let data = vec!["foo", "bar", "baz"];
-    let data_col = LargeStringArray::from(data);
-    let res = add_any_str_col_to_df(&ctx, df, data_col, "col2").await?;
-
-    assert_eq!(res.schema().fields().len(), 4); // columns count
-    assert_eq!(res.clone().count().await?, 3); // rows count
-
-    let rows = res.sort(vec![col("id").sort(true, true)])?;
-    assert_batches_eq!(
-        &[
-            "+----+------+------+------+",
-            "| id | data | col1 | col2 |",
-            "+----+------+------+------+",
-            "| 1  | 42   | foo  | foo  |",
-            "| 2  | 43   | bar  | bar  |",
-            "| 3  | 44   | baz  | baz  |",
-            "+----+------+------+------+",
-        ],
-        &rows.collect().await?
-    );
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_add_col_to_df() -> Result<()> {
-    let ctx = SessionContext::new();
-    let df = get_df3()?;
-
-    let col1 = Arc::new(StringArray::from(vec!["foo", "bar", "baz"]));
-    let col2 = Arc::new(Float64Array::from(vec![42.0, 43.0, 44.0]));
-    let df = add_col_to_df(&ctx, df, col1, "col1").await?;
-    let res = add_col_to_df(&ctx, df, col2, "col2").await?;
-
-    let rows = res.sort(vec![col("id").sort(true, true)])?;
-    assert_batches_eq!(
-        &[
-            "+----+------+------+------+",
-            "| id | data | col1 | col2 |",
-            "+----+------+------+------+",
-            "| 1  | 42   | foo  | 42.0 |",
-            "| 2  | 43   | bar  | 43.0 |",
-            "| 3  | 44   | baz  | 44.0 |",
-            "+----+------+------+------+",
-        ],
-        &rows.collect().await?
-    );
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_add_col_arr_to_df() -> Result<()> {
-    let ctx = SessionContext::new();
-    let df = get_df3()?;
-
-    let col1 = StringArray::from(vec!["foo", "bar", "baz"]);
-    let col2 = Float64Array::from(vec![42.0, 43.0, 44.0]);
-    let df = add_col_arr_to_df(&ctx, df, &col1, "col1").await?;
-    let res = add_col_arr_to_df(&ctx, df, &col2, "col2").await?;
-
-    let rows = res.sort(vec![col("id").sort(true, true)])?;
-    assert_batches_eq!(
-        &[
-            "+----+------+------+------+",
-            "| id | data | col1 | col2 |",
-            "+----+------+------+------+",
-            "| 1  | 42   | foo  | 42.0 |",
-            "| 2  | 43   | bar  | 43.0 |",
-            "| 3  | 44   | baz  | 44.0 |",
-            "+----+------+------+------+",
         ],
         &rows.collect().await?
     );
@@ -541,6 +339,33 @@ async fn test_read_file_to_df() -> Result<()> {
             "| 2  | bar  | 43   |",
             "| 3  | baz  | 44   |",
             "+----+------+------+",
+        ],
+        &rows.collect().await?
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_add_column_to_df() -> Result<()> {
+    let ctx = SessionContext::new();
+    let df = get_df3()?;
+
+    let col1: ArrayRef = Arc::new(StringArray::from(vec!["foo", "bar", "baz"]));
+    let col2: ArrayRef = Arc::new(Float64Array::from(vec![42.0, 43.0, 44.0]));
+    let df = add_column_to_df(&ctx, df, col1, "col1").await?;
+    let res = add_column_to_df(&ctx, df, col2, "col2").await?;
+
+    let rows = res.sort(vec![col("id").sort(true, true)])?;
+    assert_batches_eq!(
+        &[
+            "+----+------+------+------+",
+            "| id | data | col1 | col2 |",
+            "+----+------+------+------+",
+            "| 1  | 42   | foo  | 42.0 |",
+            "| 2  | 43   | bar  | 43.0 |",
+            "| 3  | 44   | baz  | 44.0 |",
+            "+----+------+------+------+",
         ],
         &rows.collect().await?
     );
