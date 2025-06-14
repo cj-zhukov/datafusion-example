@@ -126,10 +126,10 @@ pub async fn add_literal_col() -> Result<()> {
     let ctx = SessionContext::new();
     let df = ctx.read_batch(batch.clone())?;
 
-    let res = df.with_column("new_col1", Expr::Literal(ScalarValue::from("foo")))?;
-    let res = res.with_column("new_col2", Expr::Literal(ScalarValue::from(42)))?;
-    let res = res.with_column("new_col3", Expr::Literal(ScalarValue::Utf8(None)))?; // add null column with utf8 type
-    let res = res.with_column("new_col4", Expr::Literal(ScalarValue::Int32(None)))?; // add null column with int32 type
+    let res = df.with_column("new_col1", Expr::Literal(ScalarValue::from("foo"), None))?;
+    let res = res.with_column("new_col2", Expr::Literal(ScalarValue::from(42), None))?;
+    let res = res.with_column("new_col3", Expr::Literal(ScalarValue::Utf8(None), None))?; // add null column with utf8 type
+    let res = res.with_column("new_col4", Expr::Literal(ScalarValue::Int32(None), None))?; // add null column with int32 type
 
     res.show().await?;
 

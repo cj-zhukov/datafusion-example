@@ -50,11 +50,12 @@ pub fn get_empty_df(ctx: &SessionContext) -> Result<DataFrame, UtilsError> {
 /// Query dataframe with sql
 /// # Examples
 /// ```
-/// # use datafusion_example::{df, utils::dataframe::df_sql};
-/// let df = df!(
+/// # use datafusion_example::utils::dataframe::df_sql;
+/// use datafusion::prelude::*;
+/// let df = dataframe!(
 ///     "id" => [1, 2, 3],
 ///     "name" => ["foo", "bar", "baz"]
-/// );
+/// ).unwrap();
 /// // +----+------+,
 /// // | id | name |,
 /// // +----+------+,
@@ -89,13 +90,13 @@ pub async fn is_empty(df: DataFrame) -> Result<bool, UtilsError> {
 /// ```
 /// use datafusion::prelude::*;
 /// # use color_eyre::Result;
-/// # use datafusion_example::{df, utils::dataframe::add_pk_to_df};
+/// # use datafusion_example::utils::dataframe::add_pk_to_df;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = df!(
+/// let df = dataframe!(
 ///     "id" => [1, 2, 3],
 ///     "name" => ["foo", "bar", "baz"]
-/// );
+/// )?;
 /// // +----+------+,
 /// // | id | name |,
 /// // +----+------+,
@@ -226,10 +227,10 @@ where
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::StringArray;
-/// # use datafusion_example::{df, utils::dataframe::add_col_to_df};
+/// # use datafusion_example::utils::dataframe::add_col_to_df;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = df!("id" => [1, 2, 3]);
+/// let df = dataframe!("id" => [1, 2, 3])?;
 /// let name = StringArray::from(vec!["foo", "bar", "baz"]);
 /// let ctx = SessionContext::new();
 /// let res = add_col_to_df(&ctx, df, Arc::new(name), "name").await?;
@@ -290,10 +291,10 @@ pub async fn add_col_to_df(
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::StringArray;
-/// # use datafusion_example::{df, utils::dataframe::add_col_arr_to_df};
+/// # use datafusion_example::utils::dataframe::add_col_arr_to_df;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = df!("id" => [1, 2, 3]);
+/// let df = dataframe!("id" => [1, 2, 3])?;
 /// let name = StringArray::from(vec!["foo", "bar", "baz"]);
 /// let ctx = SessionContext::new();
 /// let res = add_col_arr_to_df(&ctx, df, &name, "name").await?;
@@ -360,12 +361,12 @@ pub async fn add_col_arr_to_df(
 /// # Examples
 /// ```
 /// use datafusion::prelude::*;
-/// # use datafusion_example::{df, utils::dataframe::select_all_exclude};
-/// let df = df!(
+/// # use datafusion_example::utils::dataframe::select_all_exclude;
+/// let df = dataframe!(
 ///     "id" => [1, 2, 3],
 ///     "name" => ["foo", "bar", "baz"],
 ///     "data" => [42, 43, 44]
-/// );
+/// ).unwrap();
 /// // +----+------+------+
 /// // | id | name | data |
 /// // +----+------+------+
@@ -447,14 +448,14 @@ pub async fn concat_dfs(
 /// ```
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
-/// # use datafusion_example::{df, utils::dataframe::df_cols_to_json};
+/// # use datafusion_example::utils::dataframe::df_cols_to_json;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = df!(
+/// let df = dataframe!(
 ///     "id" => [1, 2, 3],
 ///     "name" => [Some("foo"), Some("bar"), None],
 ///     "data" => [42, 43, 44]
-/// );
+/// )?;
 /// // +----+------+------+
 /// // | id | name | data |
 /// // +----+------+------+
@@ -535,14 +536,14 @@ pub async fn df_cols_to_json(
 /// ```
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
-/// # use datafusion_example::{df, utils::dataframe::df_cols_to_struct};
+/// # use datafusion_example::utils::dataframe::df_cols_to_struct;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = df!(
+/// let df = dataframe!(
 ///     "id" => [1, 2, 3],
 ///     "name" => ["foo", "bar", "baz"],
 ///     "data" => [42, 43, 44]
-/// );
+/// )?;
 /// // +----+------+------+
 /// // | id | name | data |
 /// // +----+------+------+

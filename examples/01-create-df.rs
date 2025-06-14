@@ -210,7 +210,7 @@ pub async fn create_df_struct2() -> Result<()> {
 
     let res = df.with_column(
         "new_col",
-        Expr::Literal(ScalarValue::Struct(struct_array.into())),
+        Expr::Literal(ScalarValue::Struct(struct_array.into()), None),
     )?;
 
     res.show().await?;

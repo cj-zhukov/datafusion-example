@@ -22,6 +22,7 @@
 /// //++
 /// //++
 /// ```
+#[deprecated]
 #[macro_export]
 macro_rules! df {
     () => {{
@@ -49,7 +50,7 @@ macro_rules! df {
 /// Macro for creating dataframe, similar (almost) to polars
 /// # Examples
 /// ```
-/// # use datafusion_example::df;
+/// # use datafusion_example::df_try;
 /// let df = df_try!(
 ///    "id" => [1, 2, 3],
 ///    "name" => ["foo", "bar", "baz"]
@@ -70,6 +71,7 @@ macro_rules! df {
 /// //++
 /// //++
 /// ```
+#[deprecated]
 #[macro_export]
 macro_rules! df_try {
     () => {{
@@ -113,6 +115,7 @@ macro_rules! df_try {
 /// //++
 /// //++
 /// ```
+#[deprecated]
 #[macro_export]
 macro_rules! dataframe {
     () => {{
