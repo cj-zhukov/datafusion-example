@@ -462,3 +462,127 @@ pub async fn df_plan_to_table(
     ctx.register_table(table_name, Arc::new(view))?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use datafusion::arrow::array::*;
+    use color_eyre::Result;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id"], Some(vec!["name", "data"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["name"], Some(vec!["id", "data"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["data"], Some(vec!["id", "name"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name"], Some(vec!["data"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "data"], Some(vec!["name"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["name", "data"], Some(vec!["id"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name", "data"], None)]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["foo"], Some(vec!["id", "name", "data"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &[""], Some(vec!["id", "name", "data"]))]
+    #[case(dataframe!()?, &["id", "name", "data"], None)]
+    fn test_select_all_exclude(
+        #[case] df: DataFrame, 
+        #[case] to_exclude: &[&str], 
+        #[case] expected: Option<Vec<&str>>,
+    ) -> Result<()> {
+        let df = select_all_exclude(df, to_exclude)?;
+        let res = get_column_names(&df);
+        assert_eq!(expected, res);
+        Ok(())
+    }
+
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, Some(vec!["id", "name", "data"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, Some(vec!["id", "name"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"data" => [42, 43, 44])?, Some(vec!["id", "data"]))]
+    #[case(dataframe!("id" => [1, 2, 3])?, Some(vec!["id"]))]
+    #[case(dataframe!()?, None)]
+    fn test_get_column_names(#[case] df: DataFrame, #[case] expected: Option<Vec<&str>>) -> Result<()> {
+        assert_eq!(expected, get_column_names(&df));
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, false)]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, false)]
+    #[case(dataframe!("id" => [1, 2, 3],"data" => [42, 43, 44])?, false)]
+    #[case(dataframe!("id" => [1, 2, 3])?, false)]
+    #[case(dataframe!("id" => [1])?, false)]
+    #[case(dataframe!("id" => [None::<i32>])?, false)]
+    #[case(dataframe!()?, true)]
+    async fn test_is_empty(
+        #[case] df: DataFrame,
+        #[case] expected: bool,
+    ) -> Result<()> {
+        assert_eq!(is_empty(df).await?, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, Arc::new(Int32Array::from(vec![1, 2, 3])), Some(vec!["id", "name", "data", "new_col"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, Arc::new(Int32Array::from(vec![1, 2, 3])), Some(vec!["id", "name", "new_col"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"data" => [42, 43, 44])?, Arc::new(Int32Array::from(vec![1, 2, 3])), Some(vec!["id", "data", "new_col"]))]
+    #[case(dataframe!("id" => [1, 2, 3])?, Arc::new(Int32Array::from(vec![1, 2, 3])), Some(vec!["id", "new_col"]))]
+    async fn test_add_column_to_df(
+        #[case] df: DataFrame,
+        #[case] data: ArrayRef,
+        #[case] expected: Option<Vec<&str>>,
+    ) -> Result<()> {
+        let ctx = SessionContext::new();
+        let df = add_column_to_df(&ctx, df, data, "new_col").await?;
+        let columns = get_column_names(&df);
+        assert_eq!(columns, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_add_column_to_empty_df() -> Result<()> {
+        let ctx = SessionContext::new();
+        let df = dataframe!()?; // empty df
+        let col = Arc::new(Int32Array::from(vec![1, 2, 3]));
+        let result = add_column_to_df(&ctx, df, col, "new_col").await;
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Empty DataFrame"));
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name", "data"], Some(vec!["new_col"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name"], Some(vec!["data", "new_col"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "data"], Some(vec!["name", "new_col"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["name", "data"], Some(vec!["id", "new_col"]))]
+    async fn test_cols_to_json(
+        #[case] df: DataFrame,
+        #[case] cols: &[&str],
+        #[case] expected: Option<Vec<&str>>,
+    ) -> Result<()> {
+        let ctx = SessionContext::new();
+        let df = df_cols_to_json(&ctx, df, cols, "new_col").await?;
+        let columns = get_column_names(&df);
+        assert_eq!(columns, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cols_to_json_col_is_not_found() -> Result<()> {
+        let ctx = SessionContext::new();
+        let df = dataframe!(
+            "id" => [1, 2, 3],
+            "name" => ["foo", "bar", "baz"]
+        )?; 
+        let result = df_cols_to_json(&ctx, df, &["foo"], "new_col").await;
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("DataFusionError"),
+            "column foo not found"
+        );
+        Ok(())
+    }
+}

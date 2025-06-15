@@ -9,13 +9,10 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::assert_batches_eq;
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::prelude::*;
-use rstest::rstest;
 use serde_json::{Map, Value};
 use tempfile::tempdir;
 
 use datafusion_example::utils::dataframe::*;
-
-use crate::helpers::*;
 
 #[test]
 fn test_convert_cols_to_json() -> Result<()> {
@@ -41,7 +38,11 @@ fn test_convert_cols_to_json() -> Result<()> {
 
 #[tokio::test]
 async fn test_concat_arrays() -> Result<()> {
-    let df = get_df1()?;
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "name" => ["foo", "bar", "baz"],
+        "data" => [42, 43, 44]
+    )?;
 
     let arrays = concat_arrays(df).await?;
     assert_eq!(arrays.len(), 3);
@@ -77,7 +78,11 @@ async fn test_concat_arrays() -> Result<()> {
 
 #[tokio::test]
 async fn test_cols_to_json() -> Result<()> {
-    let df = get_df1()?;
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "name" => ["foo", "bar", "baz"],
+        "data" => [42, 43, 44]
+    )?;
 
     let ctx = SessionContext::new();
     let res = df_cols_to_json(&ctx, df, &["name", "data"], "metadata").await?;
@@ -96,15 +101,38 @@ async fn test_cols_to_json() -> Result<()> {
             r#"| 3  | {"data":44,"name":"baz"} |"#,
             "+----+--------------------------+",
         ],
-        &rows.collect().await?
+        &rows.clone().collect().await?
     );
 
+    let batches = rows.collect().await?;
+    let mut metadata = Vec::new();
+    for batch in batches.iter() {
+        let col_array = batch.column(1)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .expect("Expected StringArray");
+
+        for i in 0..col_array.len() {
+            if col_array.is_valid(i) {
+                metadata.push(Some(col_array.value(i)));
+            } else {
+                metadata.push(None);
+            }
+        }
+    }
+    assert_eq!(metadata[0], Some(r#"{"data":42,"name":"foo"}"#));
+    assert_eq!(metadata[1], Some(r#"{"data":43,"name":"bar"}"#));
+    assert_eq!(metadata[2], Some(r#"{"data":44,"name":"baz"}"#));
     Ok(())
 }
 
 #[tokio::test]
 async fn test_cols_to_struct() -> Result<()> {
-    let df = get_df1()?;
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "name" => ["foo", "bar", "baz"],
+        "data" => [42, 43, 44]
+    )?;
 
     let ctx = SessionContext::new();
     let res = df_cols_to_struct(&ctx, df, &["name", "data"], "metadata").await?;
@@ -132,8 +160,12 @@ async fn test_cols_to_struct() -> Result<()> {
 #[tokio::test]
 async fn test_concat_dfs() -> Result<()> {
     let ctx = SessionContext::new();
-    let df1 = get_df1()?;
-    let df2 = get_df1()?;
+    let df1 = dataframe!(
+        "id" => [1, 2, 3],
+        "name" => ["foo", "bar", "baz"],
+        "data" => [42, 43, 44]
+    )?;
+    let df2 = df1.clone();
 
     let res = concat_dfs(&ctx, vec![df1, df2]).await?;
 
@@ -160,19 +192,13 @@ async fn test_concat_dfs() -> Result<()> {
     Ok(())
 }
 
-#[rstest]
-#[case(get_df1()?, Some(vec!["id", "name", "data"]))]
-#[case(get_df2()?, Some(vec!["id", "name"]))]
-#[case(get_df3()?, Some(vec!["id", "data"]))]
-#[case(get_empty_dataframe()?, None)]
-fn test_get_column_names(#[case] df: DataFrame, #[case] expected: Option<Vec<&str>>) -> Result<()> {
-    assert_eq!(expected, get_column_names(&df));
-    Ok(())
-}
-
 #[tokio::test]
 async fn test_select_all_exclude() -> Result<()> {
-    let df = get_df1()?;
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "name" => ["foo", "bar", "baz"],
+        "data" => [42, 43, 44]
+    )?;
     let res = select_all_exclude(df, &["data"])?;
 
     assert_eq!(res.schema().fields().len(), 2); // columns count
@@ -197,7 +223,11 @@ async fn test_select_all_exclude() -> Result<()> {
 
 #[tokio::test]
 async fn test_df_sql() -> Result<()> {
-    let df = get_df1()?;
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "name" => ["foo", "bar", "baz"],
+        "data" => [42, 43, 44]
+    )?;
     let sql = r#"id > 2 and data > 43 and name in ('foo', 'bar', 'baz')"#;
     let res = df_sql(df, sql).await?;
 
@@ -222,7 +252,11 @@ async fn test_df_sql() -> Result<()> {
 #[tokio::test]
 async fn test_is_empty() -> Result<()> {
     let ctx = SessionContext::new();
-    let df = get_df1()?;
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "name" => ["foo", "bar", "baz"],
+        "data" => [42, 43, 44]
+    )?;
     assert_eq!(is_empty(df).await?, false);
 
     let df = ctx.read_empty()?;
@@ -249,7 +283,11 @@ async fn test_get_empty_df() -> Result<()> {
 #[tokio::test]
 async fn test_df_to_table() -> Result<()> {
     let ctx = SessionContext::new();
-    let df = get_df1()?;
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "name" => ["foo", "bar", "baz"],
+        "data" => [42, 43, 44]
+    )?;
     df_to_table(&ctx, df, "t").await?;
     let res = ctx.sql("select * from t order by id").await?;
     assert_batches_eq!(
@@ -270,7 +308,11 @@ async fn test_df_to_table() -> Result<()> {
 #[tokio::test]
 async fn test_df_plan_to_table() -> Result<()> {
     let ctx = SessionContext::new();
-    let df = get_df1()?;
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "name" => ["foo", "bar", "baz"],
+        "data" => [42, 43, 44]
+    )?;
     df_plan_to_table(&ctx, df.logical_plan().clone(), "t").await?;
     let res = ctx.sql("select * from t order by id").await?;
     assert_batches_eq!(
@@ -292,7 +334,11 @@ async fn test_df_plan_to_table() -> Result<()> {
 #[tokio::test]
 async fn test_write_df_to_file() -> Result<()> {
     let ctx = SessionContext::new();
-    let df = get_df1()?;
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "name" => ["foo", "bar", "baz"],
+        "data" => [42, 43, 44]
+    )?;
     let dir = tempdir()?;
     let file_path = dir.path().join("foo.parquet");
     write_df_to_file(df, file_path.to_str().unwrap()).await?;
@@ -319,7 +365,11 @@ async fn test_write_df_to_file() -> Result<()> {
 #[tokio::test]
 async fn test_read_file_to_df() -> Result<()> {
     let ctx = SessionContext::new();
-    let df = get_df1()?;
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "name" => ["foo", "bar", "baz"],
+        "data" => [42, 43, 44]
+    )?;
     let dir = tempdir()?;
     let file_path = dir.path().join("foo.parquet");
     df.write_parquet(
@@ -349,7 +399,10 @@ async fn test_read_file_to_df() -> Result<()> {
 #[tokio::test]
 async fn test_add_column_to_df() -> Result<()> {
     let ctx = SessionContext::new();
-    let df = get_df3()?;
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "data" => [42, 43, 44]
+    )?;
 
     let col1: ArrayRef = Arc::new(StringArray::from(vec!["foo", "bar", "baz"]));
     let col2: ArrayRef = Arc::new(Float64Array::from(vec![42.0, 43.0, 44.0]));

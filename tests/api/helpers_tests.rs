@@ -6,11 +6,14 @@ use datafusion::assert_batches_eq;
 use datafusion::prelude::*;
 
 use datafusion_example::utils::helpers::*;
-use crate::helpers::*;
 
 #[tokio::test]
 async fn test_add_pk_to_df() -> Result<()> {
-    let df = get_df1()?;
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "name" => ["foo", "bar", "baz"],
+        "data" => [42, 43, 44]
+    )?;
 
     let ctx = SessionContext::new();
     let res = add_pk_to_df(&ctx, df, "pk").await?;
@@ -38,7 +41,10 @@ async fn test_add_pk_to_df() -> Result<()> {
 #[tokio::test]
 async fn test_add_int_col_to_df() -> Result<()> {
     let ctx = SessionContext::new();
-    let df = get_df2()?;
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "name" => ["foo", "bar", "baz"]
+    )?;
 
     let data = vec![42, 43, 44];
     let res = add_int_col_to_df(&ctx, df, data, "data").await?;
@@ -66,7 +72,10 @@ async fn test_add_int_col_to_df() -> Result<()> {
 #[tokio::test]
 async fn test_add_str_col_to_df() -> Result<()> {
     let ctx = SessionContext::new();
-    let df = get_df3()?;
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "data" => [42, 43, 44]
+    )?;
 
     let data = vec!["foo", "bar", "baz"];
     let res = add_str_col_to_df(&ctx, df, data, "name").await?;
@@ -94,7 +103,10 @@ async fn test_add_str_col_to_df() -> Result<()> {
 #[tokio::test]
 async fn test_add_any_num_col_to_df() -> Result<()> {
     let ctx = SessionContext::new();
-    let df = get_df3()?;
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "data" => [42, 43, 44]
+    )?;
 
     let data = vec![1, 2, 3];
     let data_col = Int32Array::from(data);
@@ -127,7 +139,10 @@ async fn test_add_any_num_col_to_df() -> Result<()> {
 #[tokio::test]
 async fn test_add_any_str_col_to_df() -> Result<()> {
     let ctx = SessionContext::new();
-    let df = get_df3()?;
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "data" => [42, 43, 44]
+    )?;
 
     let data = vec!["foo", "bar", "baz"];
     let data_col = StringArray::from(data);
@@ -160,7 +175,10 @@ async fn test_add_any_str_col_to_df() -> Result<()> {
 #[tokio::test]
 async fn test_add_col_to_df() -> Result<()> {
     let ctx = SessionContext::new();
-    let df = get_df3()?;
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "data" => [42, 43, 44]
+    )?;
 
     let col1 = Arc::new(StringArray::from(vec!["foo", "bar", "baz"]));
     let col2 = Arc::new(Float64Array::from(vec![42.0, 43.0, 44.0]));
@@ -187,7 +205,10 @@ async fn test_add_col_to_df() -> Result<()> {
 #[tokio::test]
 async fn test_add_col_arr_to_df() -> Result<()> {
     let ctx = SessionContext::new();
-    let df = get_df3()?;
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "data" => [42, 43, 44]
+    )?;
 
     let col1 = StringArray::from(vec!["foo", "bar", "baz"]);
     let col2 = Float64Array::from(vec![42.0, 43.0, 44.0]);
