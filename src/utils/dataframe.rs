@@ -186,7 +186,7 @@ pub async fn concat_dfs(
 /// // +----+------+------+
 /// // | 1  | foo  | 42   |
 /// // | 2  | bar  | 43   |
-/// // | 3  | baz  | 44   |
+/// // | 3  |      | 44   |
 /// // +----+------+------+
 /// let ctx = SessionContext::new();
 /// let res = df_cols_to_json(&ctx, df, &["name", "data"], "new_col").await?;
