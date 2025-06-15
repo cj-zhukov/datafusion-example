@@ -557,7 +557,7 @@ mod tests {
     #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name"], Some(vec!["data", "new_col"]))]
     #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "data"], Some(vec!["name", "new_col"]))]
     #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["name", "data"], Some(vec!["id", "new_col"]))]
-    async fn test_cols_to_json(
+    async fn test_cols_to_json_columns(
         #[case] df: DataFrame,
         #[case] cols: &[&str],
         #[case] expected: Option<Vec<&str>>,
@@ -570,19 +570,57 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_cols_to_json_col_is_not_found() -> Result<()> {
+    async fn test_cols_to_json_col_is_not_found_columns() -> Result<()> {
         let ctx = SessionContext::new();
         let df = dataframe!(
             "id" => [1, 2, 3],
             "name" => ["foo", "bar", "baz"]
         )?; 
-        let result = df_cols_to_json(&ctx, df, &["foo"], "new_col").await;
+        let result = df_cols_to_json(&ctx, df, &["column-doesnnot-exist"], "new_col").await;
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
         assert!(
             err_msg.contains("DataFusionError"),
             "column foo not found"
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name", "data"], vec![Some(r#"{"data":42,"id":1,"name":"foo"}"#), Some(r#"{"data":43,"id":2,"name":"bar"}"#), Some(r#"{"data":44,"id":3,"name":"baz"}"#)])]
+    #[case(dataframe!("id" => [Some(1), Some(2), None],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name", "data"], vec![Some(r#"{"data":42,"id":1,"name":"foo"}"#), Some(r#"{"data":43,"id":2,"name":"bar"}"#), Some(r#"{"data":44,"name":"baz"}"#)])]
+    #[case(dataframe!("id" => [None::<i32>, None, None],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name", "data"], vec![Some(r#"{"data":42,"name":"foo"}"#), Some(r#"{"data":43,"name":"bar"}"#), Some(r#"{"data":44,"name":"baz"}"#)])]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "data"], vec![Some(r#"{"data":42,"id":1}"#), Some(r#"{"data":43,"id":2}"#), Some(r#"{"data":44,"id":3}"#)])]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name"], vec![Some(r#"{"id":1,"name":"foo"}"#), Some(r#"{"id":2,"name":"bar"}"#), Some(r#"{"id":3,"name":"baz"}"#)])]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["name", "data"], vec![Some(r#"{"data":42,"name":"foo"}"#), Some(r#"{"data":43,"name":"bar"}"#), Some(r#"{"data":44,"name":"baz"}"#)])]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["name"], vec![Some(r#"{"name":"foo"}"#), Some(r#"{"name":"bar"}"#), Some(r#"{"name":"baz"}"#)])]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["data"], vec![Some(r#"{"data":42}"#), Some(r#"{"data":43}"#), Some(r#"{"data":44}"#)])]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id"], vec![Some(r#"{"id":1}"#), Some(r#"{"id":2}"#), Some(r#"{"id":3}"#)])]
+    async fn test_cols_to_json(
+        #[case] df: DataFrame,
+        #[case] cols: &[&str],
+        #[case] expected: Vec<Option<&str>>,
+    ) -> Result<()> {
+        let ctx = SessionContext::new();
+        let df = df_cols_to_json(&ctx, df, cols, "new_col").await?;
+        let batches = df.select_columns(&["new_col"])?.collect().await?;
+        let mut values = Vec::new();
+        for batch in batches.iter() {
+            let col_array = batch.column(0)
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .expect("Expected StringArray");
+            
+            for i in 0..col_array.len() {
+                if col_array.is_valid(i) {
+                    values.push(Some(col_array.value(i)));
+                } else {
+                    values.push(None);
+                }
+            }
+        }
+        assert_eq!(values, expected);
         Ok(())
     }
 }
