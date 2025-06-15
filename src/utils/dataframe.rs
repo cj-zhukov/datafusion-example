@@ -344,7 +344,11 @@ fn make_new_df(
     col_name: &str,
     new_col_type: &DataType,
 ) -> Result<DataFrame, UtilsError> {
-    let mut new_fields: Vec<Field> = old_schema.fields().iter().map(|f| f.as_ref().clone()).collect();
+    let mut new_fields: Vec<Field> = old_schema
+        .fields()
+        .iter()
+        .map(|f| f.as_ref().clone())
+        .collect();
     new_fields.push(Field::new(col_name, new_col_type.clone(), true));
     let new_schema = Arc::new(Schema::new(new_fields));
     let batch = RecordBatch::try_new(new_schema, arrays)?;
@@ -384,15 +388,17 @@ pub async fn add_column_to_df(
 ) -> Result<DataFrame, UtilsError> {
     let schema = df.schema().as_arrow().clone();
     let mut arrays = concat_arrays(df).await?;
-    let row_count = arrays.first().ok_or_else(|| {
-        DataFusionError::Execution("Empty DataFrame".into())
-    })?.len();
+    let row_count = arrays
+        .first()
+        .ok_or_else(|| DataFusionError::Execution("Empty DataFrame".into()))?
+        .len();
 
     if data.len() != row_count {
         return Err(DataFusionError::Execution(format!(
             "Column '{col_name}' has length {}, expected {row_count}",
             data.len()
-        )).into());
+        ))
+        .into());
     }
 
     let new_col_type = data.data_type().clone();
@@ -467,8 +473,9 @@ pub async fn df_plan_to_table(
 mod tests {
     use super::*;
 
-    use datafusion::arrow::array::*;
     use color_eyre::Result;
+    use datafusion::arrow::array::*;
+    use datafusion::arrow::compute::concat_batches;
     use rstest::rstest;
 
     #[rstest]
@@ -483,8 +490,8 @@ mod tests {
     #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &[""], Some(vec!["id", "name", "data"]))]
     #[case(dataframe!()?, &["id", "name", "data"], None)]
     fn test_select_all_exclude(
-        #[case] df: DataFrame, 
-        #[case] to_exclude: &[&str], 
+        #[case] df: DataFrame,
+        #[case] to_exclude: &[&str],
         #[case] expected: Option<Vec<&str>>,
     ) -> Result<()> {
         let df = select_all_exclude(df, to_exclude)?;
@@ -499,7 +506,10 @@ mod tests {
     #[case(dataframe!("id" => [1, 2, 3],"data" => [42, 43, 44])?, Some(vec!["id", "data"]))]
     #[case(dataframe!("id" => [1, 2, 3])?, Some(vec!["id"]))]
     #[case(dataframe!()?, None)]
-    fn test_get_column_names(#[case] df: DataFrame, #[case] expected: Option<Vec<&str>>) -> Result<()> {
+    fn test_get_column_names(
+        #[case] df: DataFrame,
+        #[case] expected: Option<Vec<&str>>,
+    ) -> Result<()> {
         assert_eq!(expected, get_column_names(&df));
         Ok(())
     }
@@ -513,10 +523,7 @@ mod tests {
     #[case(dataframe!("id" => [1])?, false)]
     #[case(dataframe!("id" => [None::<i32>])?, false)]
     #[case(dataframe!()?, true)]
-    async fn test_is_empty(
-        #[case] df: DataFrame,
-        #[case] expected: bool,
-    ) -> Result<()> {
+    async fn test_is_empty(#[case] df: DataFrame, #[case] expected: bool) -> Result<()> {
         assert_eq!(is_empty(df).await?, expected);
         Ok(())
     }
@@ -527,7 +534,7 @@ mod tests {
     #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, Arc::new(Int32Array::from(vec![1, 2, 3])), Some(vec!["id", "name", "new_col"]))]
     #[case(dataframe!("id" => [1, 2, 3],"data" => [42, 43, 44])?, Arc::new(Int32Array::from(vec![1, 2, 3])), Some(vec!["id", "data", "new_col"]))]
     #[case(dataframe!("id" => [1, 2, 3])?, Arc::new(Int32Array::from(vec![1, 2, 3])), Some(vec!["id", "new_col"]))]
-    async fn test_add_column_to_df(
+    async fn test_add_column_to_df_columns(
         #[case] df: DataFrame,
         #[case] data: ArrayRef,
         #[case] expected: Option<Vec<&str>>,
@@ -540,14 +547,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_add_column_to_empty_df() -> Result<()> {
+    async fn test_add_column_to_empty_df_columns() -> Result<()> {
         let ctx = SessionContext::new();
         let df = dataframe!()?; // empty df
         let col = Arc::new(Int32Array::from(vec![1, 2, 3]));
         let result = add_column_to_df(&ctx, df, col, "new_col").await;
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("Empty DataFrame"));
+        dbg!(err_msg.clone());
+        assert!(err_msg.contains("DataFusionError"), "Empty DataFrame");
         Ok(())
     }
 
@@ -570,19 +578,55 @@ mod tests {
     }
 
     #[tokio::test]
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, Arc::new(Int32Array::from(vec![1, 2, 3])), vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef])]
+    #[case(dataframe!("id" => [1, 2, 3])?, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])), vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
+    #[case(dataframe!("id" => [1, 2, 3])?, Arc::new(Float32Array::from(vec![42., 43., 44.])), vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(Float32Array::from(vec![42., 43., 44.])) as ArrayRef])]
+    #[case(dataframe!("id" => [1, 2, 3])?, Arc::new(BooleanArray::from(vec![true, true, false])), vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(BooleanArray::from(vec![true, true, false])) as ArrayRef])]
+    async fn test_add_column_to_df(
+        #[case] df: DataFrame,
+        #[case] data: ArrayRef,
+        #[case] expected: Vec<ArrayRef>,
+    ) -> Result<()> {
+        let ctx = SessionContext::new();
+        let df = add_column_to_df(&ctx, df, data, "new_col").await?;
+        let schema = df.schema().as_arrow().clone();
+        let batches = df.collect().await?;
+        let batch = concat_batches(&Arc::new(schema), &batches)?;
+        let arrays: Vec<ArrayRef> = batch.columns().to_vec();
+        assert_eq!(arrays, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_add_column_to_df_err() -> Result<()> {
+        let ctx = SessionContext::new();
+        let df = dataframe![
+            "id" => [1, 2, 3],
+            "name" => ["foo", "bar", "baz"]
+        ]?;
+        let data: ArrayRef = Arc::new(StringArray::from(vec!["foo", "foo", "foo", "foo"]));
+        let result = add_column_to_df(&ctx, df, data, "new_col").await;
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("DataFusionError"),
+            "Column new_col has length 4, expected 3"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_cols_to_json_col_is_not_found_columns() -> Result<()> {
         let ctx = SessionContext::new();
         let df = dataframe!(
             "id" => [1, 2, 3],
             "name" => ["foo", "bar", "baz"]
-        )?; 
+        )?;
         let result = df_cols_to_json(&ctx, df, &["column-doesnnot-exist"], "new_col").await;
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
-        assert!(
-            err_msg.contains("DataFusionError"),
-            "column foo not found"
-        );
+        assert!(err_msg.contains("DataFusionError"), "column foo not found");
         Ok(())
     }
 
@@ -607,11 +651,12 @@ mod tests {
         let batches = df.select_columns(&["new_col"])?.collect().await?;
         let mut values = Vec::new();
         for batch in batches.iter() {
-            let col_array = batch.column(0)
+            let col_array = batch
+                .column(0)
                 .as_any()
                 .downcast_ref::<StringArray>()
                 .expect("Expected StringArray");
-            
+
             for i in 0..col_array.len() {
                 if col_array.is_valid(i) {
                     values.push(Some(col_array.value(i)));

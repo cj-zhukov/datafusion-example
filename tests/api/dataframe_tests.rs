@@ -2,9 +2,7 @@ use std::sync::Arc;
 
 use arrow::array::Float64Array;
 use color_eyre::Result;
-use datafusion::arrow::array::{
-    Array, ArrayRef, Int32Array, RecordBatch, StringArray,
-};
+use datafusion::arrow::array::{Array, ArrayRef, Int32Array, RecordBatch, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::assert_batches_eq;
 use datafusion::dataframe::DataFrameWriteOptions;
@@ -107,7 +105,8 @@ async fn test_cols_to_json() -> Result<()> {
     let batches = rows.collect().await?;
     let mut metadata = Vec::new();
     for batch in batches.iter() {
-        let col_array = batch.column(1)
+        let col_array = batch
+            .column(1)
             .as_any()
             .downcast_ref::<StringArray>()
             .expect("Expected StringArray");

@@ -4,8 +4,8 @@ use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{Field, Schema};
 use datafusion::prelude::*;
 
-use datafusion::common::create_array;
 use arrow::array::Array;
+use datafusion::common::create_array;
 
 use crate::error::UtilsError;
 
@@ -137,7 +137,7 @@ impl<const N: usize> IntoArrayRefNew for [&str; N] {
 /// # Examples
 /// ```
 /// # use datafusion_example::utils::conversions::df_from_columns;
-/// let id = Box::new([1, 2, 3]); 
+/// let id = Box::new([1, 2, 3]);
 /// let name = Box::new(["foo", "bar", "baz"]);
 /// let df = df_from_columns(vec![("id", id), ("name", name)]).unwrap();
 /// // +----+------+,
@@ -148,7 +148,9 @@ impl<const N: usize> IntoArrayRefNew for [&str; N] {
 /// // | 3  | baz  |,
 /// // +----+------+,
 /// ```
-pub fn df_from_columns(columns: Vec<(&str, Box<dyn IntoArrayRef>)>) -> Result<DataFrame, UtilsError> {
+pub fn df_from_columns(
+    columns: Vec<(&str, Box<dyn IntoArrayRef>)>,
+) -> Result<DataFrame, UtilsError> {
     let mut fields: Vec<Field> = vec![];
     let mut arrays: Vec<ArrayRef> = vec![];
 
@@ -177,7 +179,7 @@ pub fn df_from_columns(columns: Vec<(&str, Box<dyn IntoArrayRef>)>) -> Result<Da
 /// # use datafusion_example::utils::conversions::dataframe_from_columns;
 /// use std::sync::Arc;
 /// use arrow::array::{Int32Array, StringArray, ArrayRef};
-/// let id: ArrayRef = Arc::new(Int32Array::from(vec![1, 2, 3])); 
+/// let id: ArrayRef = Arc::new(Int32Array::from(vec![1, 2, 3]));
 /// let name: ArrayRef = Arc::new(StringArray::from(vec!["foo", "bar", "baz"]));
 /// let df = dataframe_from_columns(vec![("id", id), ("name", name)]).unwrap();
 /// // +----+------+,
@@ -188,9 +190,7 @@ pub fn df_from_columns(columns: Vec<(&str, Box<dyn IntoArrayRef>)>) -> Result<Da
 /// // | 3  | baz  |,
 /// // +----+------+,
 /// ```
-pub fn dataframe_from_columns(
-    columns: Vec<(&str, ArrayRef)>
-) -> Result<DataFrame, UtilsError> {
+pub fn dataframe_from_columns(columns: Vec<(&str, ArrayRef)>) -> Result<DataFrame, UtilsError> {
     let fields = columns
         .iter()
         .map(|(name, array)| Field::new(*name, array.data_type().clone(), true))

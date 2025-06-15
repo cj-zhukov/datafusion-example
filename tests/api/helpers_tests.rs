@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use color_eyre::Result;
-use datafusion::arrow::array::{Int32Array, StringArray, Float64Array, LargeStringArray};
+use datafusion::arrow::array::{Float64Array, Int32Array, LargeStringArray, StringArray};
 use datafusion::assert_batches_eq;
 use datafusion::prelude::*;
 
