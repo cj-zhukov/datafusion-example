@@ -2,7 +2,7 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 use datafusion::arrow::array::{ArrayRef, StringArray, StructArray};
-use datafusion::arrow::compute::concat;
+use datafusion::arrow::compute::{concat, concat_batches};
 use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use datafusion::arrow::error::ArrowError;
 use datafusion::arrow::record_batch::RecordBatch;
@@ -135,7 +135,7 @@ pub fn get_column_names(df: &DataFrame) -> Option<Vec<&str>> {
     )
 }
 
-/// Concat arrays per column for dataframe
+/// Concatenates arrays per column for dataframe
 pub async fn concat_arrays(df: DataFrame) -> Result<Vec<ArrayRef>, UtilsError> {
     let schema = df.schema().clone();
     let batches = df.collect().await?;
@@ -152,6 +152,14 @@ pub async fn concat_arrays(df: DataFrame) -> Result<Vec<ArrayRef>, UtilsError> {
         arrays.push(array);
     }
     Ok(arrays)
+}
+
+/// Concatenates batches together into a single RecordBatch
+pub async fn concat_df_batches(df: DataFrame) -> Result<RecordBatch, UtilsError> {
+    let schema = df.schema().as_arrow().clone();
+    let batches = df.collect().await?;
+    let batch = concat_batches(&Arc::new(schema), &batches)?;
+    Ok(batch)
 }
 
 /// Concat dataframes with the same schema into one dataframe
@@ -666,6 +674,53 @@ mod tests {
             }
         }
         assert_eq!(values, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, vec![3, 3])]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, vec![2, 3])]
+    #[case(dataframe!("id" => [1, 2, 3])?, vec![1, 3])]
+    #[case(dataframe!("id" => [1, 2])?, vec![1, 2])]
+    #[case(dataframe!()?, vec![0, 0])]
+    async fn test_concat_df_batches(
+        #[case] df: DataFrame,
+        #[case] expected: Vec<usize>,
+    ) -> Result<()> {
+        let batch = concat_df_batches(df).await?;
+        let res = vec![batch.num_columns(), batch.num_rows()];
+        assert_eq!(res, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, vec![3, 3])]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, vec![2, 3])]
+    #[case(dataframe!("id" => [1, 2, 3])?, vec![1, 3])]
+    #[case(dataframe!("id" => [1, 2])?, vec![1, 2])]
+    async fn test_concat_arrays(
+        #[case] df: DataFrame,
+        #[case] expected: Vec<usize>,
+    ) -> Result<()> {
+        let schema = df.schema().as_arrow().clone();
+        let arrays: Vec<ArrayRef> = concat_arrays(df).await?;
+        let batch = RecordBatch::try_new(Arc::new(schema), arrays)?;
+        let res = vec![batch.num_columns(), batch.num_rows()];
+        assert_eq!(res, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_concat_arrays_err() -> Result<()> {
+        let df = dataframe!()?;
+        let schema = df.schema().as_arrow().clone();
+        let arrays: Vec<ArrayRef> = concat_arrays(df).await?;
+        let result = RecordBatch::try_new(Arc::new(schema), arrays);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Invalid argument error: must either specify a row count or at least one column"));
         Ok(())
     }
 }
