@@ -10,3 +10,4 @@ DataFusion APIs code examples
 - [`07-convert-vec-structs-to-df2.rs`](07-convert-vec-structs-to-df2.rs): Example of deserialization vec of custom structs to dataframe 
 - [`08-convert-vec-structs-to-df-trait.rs`](08-convert-vec-structs-to-df-trait.rs): Example of deserialization vec of custom structs to dataframe using trait
 - [`09-algos.rs`](09-algos.rs): Example of algorithms (round-robin, random, least values) using sql
+- [`10-udf.rs`](10-udf.rs): Example of udf

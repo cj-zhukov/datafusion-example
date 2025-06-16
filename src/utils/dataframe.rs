@@ -467,7 +467,7 @@ pub async fn df_to_table(
 }
 
 /// Register dataframe plan as table to query later
-pub async fn df_plan_to_table(
+pub fn df_plan_to_table(
     ctx: &SessionContext,
     plan: LogicalPlan,
     table_name: &str,

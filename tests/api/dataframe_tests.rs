@@ -312,7 +312,7 @@ async fn test_df_plan_to_table() -> Result<()> {
         "name" => ["foo", "bar", "baz"],
         "data" => [42, 43, 44]
     )?;
-    df_plan_to_table(&ctx, df.logical_plan().clone(), "t").await?;
+    df_plan_to_table(&ctx, df.logical_plan().clone(), "t")?;
     let res = ctx.sql("select * from t order by id").await?;
     assert_batches_eq!(
         &[
