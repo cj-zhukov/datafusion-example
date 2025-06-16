@@ -623,7 +623,7 @@ mod tests {
     #[case(dataframe!("id" => [1, 2, 3])?, vec![1, 3])]
     #[case(dataframe!("id" => [1, 2])?, vec![1, 2])]
     #[case(dataframe!()?, vec![0, 0])]
-    async fn test_concat_df_batches(
+    async fn test_concat_df_batches_cols_rows(
         #[case] df: DataFrame,
         #[case] expected: Vec<usize>,
     ) -> Result<()> {
@@ -635,11 +635,26 @@ mod tests {
 
     #[tokio::test]
     #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef])]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
+    #[case(dataframe!("id" => [1, 2, 3])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef])]
+    async fn test_concat_df_batches(
+        #[case] df: DataFrame,
+        #[case] expected: Vec<ArrayRef>,
+    ) -> Result<()> {
+        let batch = concat_df_batches(df).await?;
+        let arrays: Vec<ArrayRef> = batch.columns().to_vec();
+        assert_eq!(arrays, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[rstest]
     #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, vec![3, 3])]
     #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, vec![2, 3])]
     #[case(dataframe!("id" => [1, 2, 3])?, vec![1, 3])]
     #[case(dataframe!("id" => [1, 2])?, vec![1, 2])]
-    async fn test_concat_arrays(
+    async fn test_concat_arrays_cols_rows(
         #[case] df: DataFrame,
         #[case] expected: Vec<usize>,
     ) -> Result<()> {
@@ -648,6 +663,20 @@ mod tests {
         let batch = RecordBatch::try_new(Arc::new(schema), arrays)?;
         let res = vec![batch.num_columns(), batch.num_rows()];
         assert_eq!(res, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef])]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
+    #[case(dataframe!("id" => [1, 2, 3])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef])]
+    async fn test_concat_arrays(
+        #[case] df: DataFrame,
+        #[case] expected: Vec<ArrayRef>,
+    ) -> Result<()> {
+        let arrays: Vec<ArrayRef> = concat_arrays(df).await?;
+        assert_eq!(arrays, expected);
         Ok(())
     }
 

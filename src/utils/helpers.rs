@@ -148,71 +148,6 @@ where
 /// Add column to existing dataframe
 /// # Examples
 /// ```
-/// use std::sync::Arc;
-/// # use color_eyre::Result;
-/// use datafusion::prelude::*;
-/// use datafusion::arrow::array::StringArray;
-/// # use datafusion_example::utils::helpers::add_col_to_df;
-/// # #[tokio::main]
-/// # async fn main() -> Result<()> {
-/// let df = dataframe!("id" => [1, 2, 3])?;
-/// let name = StringArray::from(vec!["foo", "bar", "baz"]);
-/// let ctx = SessionContext::new();
-/// let res = add_col_to_df(&ctx, df, Arc::new(name), "name").await?;
-/// // +----+------+,
-/// // | id | name |,
-/// // +----+------+,
-/// // | 1  | foo  |,
-/// // | 2  | bar  |,
-/// // | 3  | baz  |,
-/// // +----+------+,
-/// # Ok(())
-/// # }
-/// ```
-pub async fn add_col_to_df(
-    ctx: &SessionContext,
-    df: DataFrame,
-    data: ArrayRef,
-    col_name: &str,
-) -> Result<DataFrame, UtilsError> {
-    let schema_ref = Arc::new(df.schema().as_arrow().clone());
-    let mut arrays = concat_arrays(df).await?;
-    let row_count = arrays
-        .first()
-        .ok_or_else(|| DataFusionError::Execution("empty DataFrame".into()))?
-        .len();
-
-    if data.len() != row_count {
-        return Err(DataFusionError::Execution(format!(
-            "new column '{col_name}' has length {}, expected {row_count}",
-            data.len()
-        ))
-        .into());
-    }
-
-    arrays.push(data);
-
-    let mut new_fields: Vec<Field> = schema_ref
-        .fields()
-        .iter()
-        .map(|f| f.as_ref().clone())
-        .collect();
-    let new_col_type = arrays
-        .last()
-        .expect("arrays should contain at least one column")
-        .data_type()
-        .clone();
-    new_fields.push(Field::new(col_name, new_col_type, true));
-    let new_schema = Arc::new(Schema::new(new_fields));
-
-    let final_batch = RecordBatch::try_new(new_schema, arrays)?;
-    let res = ctx.read_batch(final_batch)?;
-    Ok(res)
-}
-
-/// Add column to existing dataframe
-/// # Examples
-/// ```
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::StringArray;
@@ -286,7 +221,7 @@ pub async fn add_col_arr_to_df(
 /// # Examples
 /// ```
 /// use datafusion::prelude::*;
-/// # use datafusion_example::utils::dataframe::select_all_exclude;
+/// # use datafusion_example::utils::helpers::select_all_exclude;
 /// let df = dataframe!(
 ///     "id" => [1, 2, 3],
 ///     "name" => ["foo", "bar", "baz"],
@@ -324,9 +259,10 @@ pub fn select_all_exclude(df: DataFrame, to_exclude: &[&str]) -> Result<DataFram
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::dataframe::get_column_names;
+    use crate::utils::dataframe::{concat_df_batches, get_column_names};
 
     use color_eyre::Result;
+    use datafusion::arrow::datatypes::{Int32Type, Utf8Type};
     use datafusion::arrow::compute::concat_batches;
     use rstest::rstest;
 
@@ -379,6 +315,96 @@ mod tests {
         let err_msg = result.unwrap_err().to_string();
         dbg!(err_msg.clone());
         assert!(err_msg.contains("DataFusionError"), "Empty DataFrame");
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3])?, vec![1, 2, 3], vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef])]
+    #[case(dataframe!("name" => ["foo", "bar", "baz"])?, vec![1, 2, 3], vec![Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef])]
+    #[case(dataframe!("data" => [true, true, false])?, vec![1, 2, 3], vec![Arc::new(BooleanArray::from(vec![true, true, false])) as ArrayRef, Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef])]
+    async fn test_add_int_col_to_df(
+        #[case] df: DataFrame,
+        #[case] data: Vec<i32>,
+        #[case] expected: Vec<ArrayRef>,
+    ) -> Result<()> {
+        let ctx = SessionContext::new();
+        let res = add_int_col_to_df(&ctx, df, data, "new_col").await?;
+        let batch = concat_df_batches(res).await?;
+        let arrays: Vec<ArrayRef> = batch.columns().to_vec();
+        assert_eq!(arrays, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3])?, vec!["foo", "bar", "baz"], vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
+    #[case(dataframe!("name" => ["foo", "bar", "baz"])?, vec!["foo", "bar", "baz"], vec![Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
+    #[case(dataframe!("data" => [true, true, false])?, vec!["foo", "bar", "baz"], vec![Arc::new(BooleanArray::from(vec![true, true, false])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
+    async fn test_add_str_col_to_df(
+        #[case] df: DataFrame,
+        #[case] data: Vec<&str>,
+        #[case] expected: Vec<ArrayRef>,
+    ) -> Result<()> {
+        let ctx = SessionContext::new();
+        let res = add_str_col_to_df(&ctx, df, data, "new_col").await?;
+        let batch = concat_df_batches(res).await?;
+        let arrays: Vec<ArrayRef> = batch.columns().to_vec();
+        assert_eq!(arrays, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3])?, Into::<PrimitiveArray<Int32Type>>::into(vec![1, 2, 3]), vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef])]
+    #[case(dataframe!("name" => ["foo", "bar", "baz"])?, Into::<PrimitiveArray<Int32Type>>::into(vec![1, 2, 3]), vec![Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef])]
+    #[case(dataframe!("data" => [true, true, false])?, Into::<PrimitiveArray<Int32Type>>::into(vec![1, 2, 3]), vec![Arc::new(BooleanArray::from(vec![true, true, false])) as ArrayRef, Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef])]
+    async fn test_add_any_num_col_to_df<T: ArrowPrimitiveType>(
+        #[case] df: DataFrame,
+        #[case] data: PrimitiveArray<T>,
+        #[case] expected: Vec<ArrayRef>,
+    ) -> Result<()> {
+        let ctx = SessionContext::new();
+        let res = add_any_num_col_to_df(&ctx, df, data, "new_col").await?;
+        let batch = concat_df_batches(res).await?;
+        let arrays: Vec<ArrayRef> = batch.columns().to_vec();
+        assert_eq!(arrays, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3])?, Into::<GenericByteArray<Utf8Type>>::into(vec!["foo", "bar", "baz"]), vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
+    #[case(dataframe!("name" => ["foo", "bar", "baz"])?, Into::<GenericByteArray<Utf8Type>>::into(vec!["foo", "bar", "baz"]), vec![Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
+    #[case(dataframe!("data" => [true, true, false])?, Into::<GenericByteArray<Utf8Type>>::into(vec!["foo", "bar", "baz"]), vec![Arc::new(BooleanArray::from(vec![true, true, false])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
+    async fn test_add_any_str_col_to_df<T: ByteArrayType>(
+        #[case] df: DataFrame,
+        #[case] data: GenericByteArray<T>,
+        #[case] expected: Vec<ArrayRef>,
+    ) -> Result<()> {
+        let ctx = SessionContext::new();
+        let res = add_any_str_col_to_df(&ctx, df, data, "new_col").await?;
+        let batch = concat_df_batches(res).await?;
+        let arrays: Vec<ArrayRef> = batch.columns().to_vec();
+        assert_eq!(arrays, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3])?, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])), vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
+    #[case(dataframe!("name" => ["foo", "bar", "baz"])?, Arc::new(Int32Array::from(vec![1, 2, 3])), vec![Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef])]
+    #[case(dataframe!("data" => [true, true, false])?, Arc::new(BooleanArray::from(vec![true, true, false])), vec![Arc::new(BooleanArray::from(vec![true, true, false])) as ArrayRef, Arc::new(BooleanArray::from(vec![true, true, false])) as ArrayRef])]
+    async fn test_add_col_arr_to_df(
+        #[case] df: DataFrame,
+        #[case] data: ArrayRef,
+        #[case] expected: Vec<ArrayRef>,
+    ) -> Result<()> {
+        let ctx = SessionContext::new();
+        let res = add_col_arr_to_df(&ctx, df, &data, "new_col").await?;
+        let batch = concat_df_batches(res).await?;
+        let arrays: Vec<ArrayRef> = batch.columns().to_vec();
+        assert_eq!(arrays, expected);
         Ok(())
     }
 }

@@ -193,6 +193,62 @@ async fn test_concat_dfs() -> Result<()> {
 }
 
 #[tokio::test]
+async fn test_concat_df_batches() -> Result<()> {
+    let ctx = SessionContext::new();
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "name" => ["foo", "bar", "baz"],
+        "data" => [42, 43, 44]
+    )?;
+    let batch = concat_df_batches(df).await?;
+    ctx.register_batch("t", batch)?;
+    let res = ctx.sql("select * from t order by id").await?;
+    assert_batches_eq!(
+        &[
+            "+----+------+------+",
+            "| id | name | data |",
+            "+----+------+------+",
+            "| 1  | foo  | 42   |",
+            "| 2  | bar  | 43   |",
+            "| 3  | baz  | 44   |",
+            "+----+------+------+",
+        ],
+        &res.collect().await?
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_concat_arays() -> Result<()> {
+    let ctx = SessionContext::new();
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "name" => ["foo", "bar", "baz"],
+        "data" => [42, 43, 44]
+    )?;
+    let schema_ref = Arc::new(df.schema().as_arrow().clone());
+    let arrays: Vec<ArrayRef> = concat_arrays(df).await?;
+    let batch = RecordBatch::try_new(schema_ref.clone(), arrays)?;
+    ctx.register_batch("t", batch)?;
+    let res = ctx.sql("select * from t order by id").await?;
+    assert_batches_eq!(
+        &[
+            "+----+------+------+",
+            "| id | name | data |",
+            "+----+------+------+",
+            "| 1  | foo  | 42   |",
+            "| 2  | bar  | 43   |",
+            "| 3  | baz  | 44   |",
+            "+----+------+------+",
+        ],
+        &res.collect().await?
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_select_all_exclude() -> Result<()> {
     let df = dataframe!(
         "id" => [1, 2, 3],
@@ -305,6 +361,7 @@ async fn test_df_to_table() -> Result<()> {
 
     Ok(())
 }
+
 #[tokio::test]
 async fn test_df_plan_to_table() -> Result<()> {
     let ctx = SessionContext::new();

@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use color_eyre::Result;
 use datafusion::arrow::array::{Float64Array, Int32Array, LargeStringArray, StringArray};
 use datafusion::assert_batches_eq;
@@ -164,36 +162,6 @@ async fn test_add_any_str_col_to_df() -> Result<()> {
             "| 1  | 42   | foo  | foo  |",
             "| 2  | 43   | bar  | bar  |",
             "| 3  | 44   | baz  | baz  |",
-            "+----+------+------+------+",
-        ],
-        &rows.collect().await?
-    );
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_add_col_to_df() -> Result<()> {
-    let ctx = SessionContext::new();
-    let df = dataframe!(
-        "id" => [1, 2, 3],
-        "data" => [42, 43, 44]
-    )?;
-
-    let col1 = Arc::new(StringArray::from(vec!["foo", "bar", "baz"]));
-    let col2 = Arc::new(Float64Array::from(vec![42.0, 43.0, 44.0]));
-    let df = add_col_to_df(&ctx, df, col1, "col1").await?;
-    let res = add_col_to_df(&ctx, df, col2, "col2").await?;
-
-    let rows = res.sort(vec![col("id").sort(true, true)])?;
-    assert_batches_eq!(
-        &[
-            "+----+------+------+------+",
-            "| id | data | col1 | col2 |",
-            "+----+------+------+------+",
-            "| 1  | 42   | foo  | 42.0 |",
-            "| 2  | 43   | bar  | 43.0 |",
-            "| 3  | 44   | baz  | 44.0 |",
             "+----+------+------+------+",
         ],
         &rows.collect().await?
