@@ -82,45 +82,6 @@ pub async fn is_empty(df: DataFrame) -> Result<bool, UtilsError> {
     Ok(is_empty && is_empty_schema)
 }
 
-/// Select dataframe with all columns except to_exclude (better use drop_columns)
-/// # Examples
-/// ```
-/// use datafusion::prelude::*;
-/// # use datafusion_example::utils::dataframe::select_all_exclude;
-/// let df = dataframe!(
-///     "id" => [1, 2, 3],
-///     "name" => ["foo", "bar", "baz"],
-///     "data" => [42, 43, 44]
-/// ).unwrap();
-/// // +----+------+------+
-/// // | id | name | data |
-/// // +----+------+------+
-/// // | 1  | foo  | 42   |
-/// // | 2  | bar  | 43   |
-/// // | 3  | baz  | 44   |
-/// // +----+------+------+
-/// let ctx = SessionContext::new();
-/// let res = select_all_exclude(df, &["name", "data"]);
-/// // +----+
-/// // | id |
-/// // +----+
-/// // | 1  |
-/// // | 2  |
-/// // | 3  |
-/// // +----+
-/// ```
-pub fn select_all_exclude(df: DataFrame, to_exclude: &[&str]) -> Result<DataFrame, UtilsError> {
-    let schema = df.schema().clone();
-    let columns = schema
-        .fields()
-        .iter()
-        .map(|x| x.name().as_str())
-        .filter(|name| !to_exclude.contains(name))
-        .collect::<Vec<_>>();
-    let res = df.select_columns(&columns)?;
-    Ok(res)
-}
-
 /// Returns column names if the schema is not empty.
 pub fn get_column_names(df: &DataFrame) -> Option<Vec<&str>> {
     let fields = df.schema().fields();
@@ -485,28 +446,6 @@ mod tests {
     use datafusion::arrow::array::*;
     use datafusion::arrow::compute::concat_batches;
     use rstest::rstest;
-
-    #[rstest]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id"], Some(vec!["name", "data"]))]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["name"], Some(vec!["id", "data"]))]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["data"], Some(vec!["id", "name"]))]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name"], Some(vec!["data"]))]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "data"], Some(vec!["name"]))]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["name", "data"], Some(vec!["id"]))]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name", "data"], None)]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["foo"], Some(vec!["id", "name", "data"]))]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &[""], Some(vec!["id", "name", "data"]))]
-    #[case(dataframe!()?, &["id", "name", "data"], None)]
-    fn test_select_all_exclude(
-        #[case] df: DataFrame,
-        #[case] to_exclude: &[&str],
-        #[case] expected: Option<Vec<&str>>,
-    ) -> Result<()> {
-        let df = select_all_exclude(df, to_exclude)?;
-        let res = get_column_names(&df);
-        assert_eq!(expected, res);
-        Ok(())
-    }
 
     #[rstest]
     #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, Some(vec!["id", "name", "data"]))]

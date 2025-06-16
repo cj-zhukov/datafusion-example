@@ -7,6 +7,7 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::assert_batches_eq;
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::prelude::*;
+use datafusion_example::utils::helpers::select_all_exclude;
 use serde_json::{Map, Value};
 use tempfile::tempdir;
 

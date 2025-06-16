@@ -281,3 +281,104 @@ pub async fn add_col_arr_to_df(
     let res = ctx.read_batch(batch)?;
     Ok(res)
 }
+
+/// Select dataframe with all columns except to_exclude (better use drop_columns)
+/// # Examples
+/// ```
+/// use datafusion::prelude::*;
+/// # use datafusion_example::utils::dataframe::select_all_exclude;
+/// let df = dataframe!(
+///     "id" => [1, 2, 3],
+///     "name" => ["foo", "bar", "baz"],
+///     "data" => [42, 43, 44]
+/// ).unwrap();
+/// // +----+------+------+
+/// // | id | name | data |
+/// // +----+------+------+
+/// // | 1  | foo  | 42   |
+/// // | 2  | bar  | 43   |
+/// // | 3  | baz  | 44   |
+/// // +----+------+------+
+/// let ctx = SessionContext::new();
+/// let res = select_all_exclude(df, &["name", "data"]);
+/// // +----+
+/// // | id |
+/// // +----+
+/// // | 1  |
+/// // | 2  |
+/// // | 3  |
+/// // +----+
+/// ```
+pub fn select_all_exclude(df: DataFrame, to_exclude: &[&str]) -> Result<DataFrame, UtilsError> {
+    let schema = df.schema().clone();
+    let columns = schema
+        .fields()
+        .iter()
+        .map(|x| x.name().as_str())
+        .filter(|name| !to_exclude.contains(name))
+        .collect::<Vec<_>>();
+    let res = df.select_columns(&columns)?;
+    Ok(res)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::utils::dataframe::get_column_names;
+
+    use color_eyre::Result;
+    use datafusion::arrow::compute::concat_batches;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id"], Some(vec!["name", "data"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["name"], Some(vec!["id", "data"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["data"], Some(vec!["id", "name"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name"], Some(vec!["data"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "data"], Some(vec!["name"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["name", "data"], Some(vec!["id"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name", "data"], None)]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["foo"], Some(vec!["id", "name", "data"]))]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &[""], Some(vec!["id", "name", "data"]))]
+    #[case(dataframe!()?, &["id", "name", "data"], None)]
+    fn test_select_all_exclude(
+        #[case] df: DataFrame,
+        #[case] to_exclude: &[&str],
+        #[case] expected: Option<Vec<&str>>,
+    ) -> Result<()> {
+        let df = select_all_exclude(df, to_exclude)?;
+        let res = get_column_names(&df);
+        assert_eq!(expected, res);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(Int32Array::from(vec![0, 1, 2])) as ArrayRef])]
+    #[case(dataframe!("name" => ["foo", "bar", "baz"])?, vec![Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![0, 1, 2])) as ArrayRef])]
+    async fn test_add_pk_to_df(
+        #[case] df: DataFrame,
+        #[case] expected: Vec<ArrayRef>,
+    ) -> Result<()> {
+        let ctx = SessionContext::new();
+        let df = add_pk_to_df(&ctx, df, "pk").await?;
+        let schema = df.schema().as_arrow().clone();
+        let batches = df.collect().await?;
+        let batch = concat_batches(&Arc::new(schema), &batches)?;
+        let arrays: Vec<ArrayRef> = batch.columns().to_vec();
+        assert_eq!(arrays, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_add_pk_to_df_err() -> Result<()> {
+        let ctx = SessionContext::new();
+        let df = dataframe!()?;
+        let result = add_pk_to_df(&ctx, df, "pk").await;
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        dbg!(err_msg.clone());
+        assert!(err_msg.contains("DataFusionError"), "Empty DataFrame");
+        Ok(())
+    }
+}
