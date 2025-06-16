@@ -28,15 +28,14 @@ pub async fn split_name() -> Result<()> {
             _ => {
                 return Err(datafusion::error::DataFusionError::Execution(
                     "Expected array as input".to_string(),
-                ))
+                ));
             }
         };
 
         let result: StringArray = input
             .iter()
             .map(|maybe_str| {
-                maybe_str
-                    .and_then(|s| s.split('.').next().map(|part| part.to_string()))
+                maybe_str.and_then(|s| s.split('.').next().map(|part| part.to_string()))
             })
             .collect();
 
@@ -74,15 +73,14 @@ pub async fn split_name_sql() -> Result<()> {
             _ => {
                 return Err(datafusion::error::DataFusionError::Execution(
                     "Expected array as input".to_string(),
-                ))
+                ));
             }
         };
 
         let result: StringArray = input
             .iter()
             .map(|maybe_str| {
-                maybe_str
-                    .and_then(|s| s.split('.').nth(1).map(|part| part.to_string()))
+                maybe_str.and_then(|s| s.split('.').nth(1).map(|part| part.to_string()))
             })
             .collect();
 
@@ -104,7 +102,9 @@ pub async fn split_name_sql() -> Result<()> {
     )?;
     df_plan_to_table(&ctx, df.logical_plan().clone(), "t")?;
     ctx.register_udf(udf);
-    let res = ctx.sql("select id, split_text(name) as extension from t").await?;
+    let res = ctx
+        .sql("select id, split_text(name) as extension from t")
+        .await?;
     res.show().await?;
     Ok(())
 }

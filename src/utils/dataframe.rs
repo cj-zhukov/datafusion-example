@@ -688,7 +688,9 @@ mod tests {
         let result = RecordBatch::try_new(Arc::new(schema), arrays);
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("Invalid argument error: must either specify a row count or at least one column"));
+        assert!(err_msg.contains(
+            "Invalid argument error: must either specify a row count or at least one column"
+        ));
         Ok(())
     }
 }

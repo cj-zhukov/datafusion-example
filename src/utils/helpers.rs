@@ -262,8 +262,8 @@ mod tests {
     use crate::utils::dataframe::{concat_df_batches, get_column_names};
 
     use color_eyre::Result;
-    use datafusion::arrow::datatypes::{Int32Type, Utf8Type};
     use datafusion::arrow::compute::concat_batches;
+    use datafusion::arrow::datatypes::{Int32Type, Utf8Type};
     use rstest::rstest;
 
     #[rstest]
