@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
-use arrow::array::Float64Array;
 use color_eyre::Result;
-use datafusion::arrow::array::{Array, ArrayRef, Int32Array, RecordBatch, StringArray};
+use datafusion::arrow::array::{
+    Array, ArrayRef, Float64Array, Int32Array, RecordBatch, StringArray,
+};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::assert_batches_eq;
 use datafusion::dataframe::DataFrameWriteOptions;

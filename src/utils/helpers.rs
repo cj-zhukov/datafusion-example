@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use datafusion::arrow::array::{
     Array, ArrayRef, BinaryArray, BooleanArray, Float32Array, Float64Array, GenericByteArray,
-    Int32Array, Int64Array, PrimitiveArray, StringArray,
+    Int32Array, Int64Array, PrimitiveArray, StringArray, StructArray,
 };
 use datafusion::arrow::datatypes::{ArrowPrimitiveType, ByteArrayType, DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
@@ -256,10 +256,70 @@ pub fn select_all_exclude(df: DataFrame, to_exclude: &[&str]) -> Result<DataFram
     Ok(res)
 }
 
+/// Extract values from a StructArray as Vec<Vec<String>>, row-wise
+/// # Examples
+/// ```
+/// # use std::sync::Arc;
+/// use datafusion::prelude::*;
+/// # use datafusion::arrow::datatypes::{DataType, Field};
+/// # use datafusion_example::utils::helpers::extract_struct_array_values;
+/// # use color_eyre::Result;
+/// # use datafusion::arrow::array::{ArrayRef, BooleanArray, Int32Array, StructArray};
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
+/// let boolean = Arc::new(BooleanArray::from(vec![true, true, false]));
+/// let int = Arc::new(Int32Array::from(vec![42, 43, 44]));
+/// let array = StructArray::from(vec![
+///    (
+///        Arc::new(Field::new("a", DataType::Boolean, false)),
+///        boolean as ArrayRef,
+///    ),
+///    (
+///        Arc::new(Field::new("b", DataType::Int32, false)),
+///        int as ArrayRef,
+///    ),
+/// ]);
+/// let res = extract_struct_array_values(&array);
+/// assert_eq!(res, vec![vec!["true", "42"], vec!["true", "43"], vec!["false", "44"]]);
+/// # Ok(())
+/// # }
+/// ```
+pub fn extract_struct_array_values(array: &StructArray) -> Vec<Vec<String>> {
+    let num_rows = array.len();
+    let num_fields = array.num_columns();
+    let mut result = Vec::with_capacity(num_rows);
+
+    for row_idx in 0..num_rows {
+        if array.is_null(row_idx) {
+            result.push(vec![]);
+            continue;
+        }
+
+        let mut row_values = Vec::with_capacity(num_fields);
+        for col_idx in 0..num_fields {
+            let col = array.column(col_idx);
+            let value = if col.is_null(row_idx) {
+                "null".to_string()
+            } else if let Some(str_arr) = col.as_any().downcast_ref::<StringArray>() {
+                str_arr.value(row_idx).to_string()
+            } else if let Some(int_arr) = col.as_any().downcast_ref::<Int32Array>() {
+                int_arr.value(row_idx).to_string()
+            } else if let Some(bool_arr) = col.as_any().downcast_ref::<BooleanArray>() {
+                bool_arr.value(row_idx).to_string()
+            } else {
+                unimplemented!()
+            };
+            row_values.push(value);
+        }
+        result.push(row_values);
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::dataframe::{concat_df_batches, get_column_names};
+    use crate::utils::dataframe::{concat_df_batches, df_cols_to_struct, get_column_names};
 
     use color_eyre::Result;
     use datafusion::arrow::compute::concat_batches;
@@ -405,6 +465,34 @@ mod tests {
         let batch = concat_df_batches(res).await?;
         let arrays: Vec<ArrayRef> = batch.columns().to_vec();
         assert_eq!(arrays, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name", "data"], vec![vec!["1", "foo", "42"], vec!["2", "bar", "43"], vec!["3", "baz", "44"]])]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [true, true, false])?, &["id", "name", "data"], vec![vec!["1", "foo", "true"], vec!["2", "bar", "true"], vec!["3", "baz", "false"]])]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, &["id", "name"], vec![vec!["1", "foo"], vec!["2", "bar"], vec!["3", "baz"]])]
+    #[case(dataframe!("id" => [1, 2, 3])?, &["id"], vec![vec!["1"], vec!["2"], vec!["3"]])]
+    async fn test_extract_struct_array_values(
+        #[case] df: DataFrame,
+        #[case] cols: &[&str],
+        #[case] expected: Vec<Vec<&str>>,
+    ) -> Result<()> {
+        let ctx = SessionContext::new();
+        let df = df_cols_to_struct(&ctx, df, cols, "new_col")
+            .await?
+            .select_columns(&["new_col"])?;
+        let schema = df.schema().as_arrow().clone();
+        let batches = df.collect().await?;
+        let batch = concat_batches(&Arc::new(schema), &batches)?;
+        let array = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<StructArray>()
+            .unwrap();
+        let res = extract_struct_array_values(array);
+        assert_eq!(res, expected);
         Ok(())
     }
 }

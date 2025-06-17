@@ -441,6 +441,7 @@ pub fn df_plan_to_table(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::helpers::extract_struct_array_values;
 
     use color_eyre::Result;
     use datafusion::arrow::array::*;
@@ -613,6 +614,48 @@ mod tests {
             }
         }
         assert_eq!(values, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name", "data"], vec![vec!["1", "foo", "42"], vec!["2", "bar", "43"], vec!["3", "baz", "44"]])]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [true, true, false])?, &["id", "name", "data"], vec![vec!["1", "foo", "true"], vec!["2", "bar", "true"], vec!["3", "baz", "false"]])]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, &["id", "name"], vec![vec!["1", "foo"], vec!["2", "bar"], vec!["3", "baz"]])]
+    #[case(dataframe!("id" => [1, 2, 3])?, &["id"], vec![vec!["1"], vec!["2"], vec!["3"]])]
+    async fn test_cols_to_struct(
+        #[case] df: DataFrame,
+        #[case] cols: &[&str],
+        #[case] expected: Vec<Vec<&str>>,
+    ) -> Result<()> {
+        let ctx = SessionContext::new();
+        let df = df_cols_to_struct(&ctx, df, cols, "new_col")
+            .await?
+            .select_columns(&["new_col"])?;
+        let schema = df.schema().as_arrow().clone();
+        let batches = df.collect().await?;
+        let batch = concat_batches(&Arc::new(schema), &batches)?;
+        let array = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<StructArray>()
+            .unwrap();
+        let res = extract_struct_array_values(array);
+        assert_eq!(res, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cols_to_struct_err() -> Result<()> {
+        let ctx = SessionContext::new();
+        let df = dataframe!(
+            "id" => [1, 2, 3],
+            "name" => ["foo", "bar", "baz"]
+        )?;
+        let result = df_cols_to_struct(&ctx, df, &["foo"], "new_col").await;
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("DataFusionError"), "column foo not found");
         Ok(())
     }
 

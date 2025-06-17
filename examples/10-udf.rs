@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
-use arrow::array::ArrayRef;
 use color_eyre::Result;
-use datafusion::arrow::array::StringArray;
+use datafusion::arrow::array::{ArrayRef, StringArray};
 use datafusion::arrow::datatypes::DataType;
 use datafusion::logical_expr::{ColumnarValue, Volatility};
 use datafusion::prelude::*;
