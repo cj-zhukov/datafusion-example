@@ -15,10 +15,10 @@ async fn main() -> Result<()> {
     create_df3().await?;
     create_df4().await?;
     create_df5().await?;
+    create_df_with_macro().await?;
     create_df_struct1().await?;
     create_df_struct2().await?;
     create_df_list_arr().await?;
-
     Ok(())
 }
 
@@ -252,5 +252,14 @@ pub async fn create_df_list_arr() -> Result<()> {
 
     res.show().await?;
 
+    Ok(())
+}
+
+pub async fn create_df_with_macro() -> Result<()> {
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "name" => ["foo", "bar", "baz"]
+    )?;
+    df.show().await?;
     Ok(())
 }
