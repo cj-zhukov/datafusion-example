@@ -438,7 +438,23 @@ pub fn df_plan_to_table(
     Ok(())
 }
 
-/// Convert dataframe to json like data that can be used later to store as string
+/// Convert dataframe to json like data that can be used later to store as string,
+/// note that not all types can be serealized
+/// # Examples
+/// ```
+/// # use color_eyre::Result;
+/// use datafusion::prelude::*;
+/// use serde_json::Value;
+/// # use datafusion_example::utils::dataframe::df_to_json_bytes;
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
+/// let df = dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?;
+/// let res = df_to_json_bytes(df).await?;
+/// let value: Value = serde_json::from_slice(&res)?;
+/// assert_eq!(value.to_string(), r#"[{"id":1,"name":"foo"},{"id":2,"name":"bar"},{"id":3,"name":"baz"}]"#);
+/// # Ok(())
+/// # }
+/// ```
 pub async fn df_to_json_bytes(df: DataFrame) -> Result<Vec<u8>, UtilsError>{
     let batches = df.collect().await?;
     let buf = vec![];
@@ -751,29 +767,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_df_to_json_bytes() -> Result<()> {
-        let df = dataframe!(
-            "id" => [1, 2, 3],
-            "name" => ["foo", "bar", "baz"]
-        )?;
-        let json_data = df_to_json_bytes(df).await?;
-        let json_rows: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice())?;
-
-        assert_eq!(
-            serde_json::Value::Object(json_rows[0].clone()),
-            serde_json::json!({"id": 1, "name": "foo"}),
-        );
-
-        assert_eq!(
-            serde_json::Value::Object(json_rows[1].clone()),
-            serde_json::json!({"id": 2, "name": "bar"}),
-        );
-
-        assert_eq!(
-            serde_json::Value::Object(json_rows[2].clone()),
-            serde_json::json!({"id": 3, "name": "baz"}),
-        );
-
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, r#"[{"data":42,"id":1,"name":"foo"},{"data":43,"id":2,"name":"bar"},{"data":44,"id":3,"name":"baz"}]"#)]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, r#"[{"id":1,"name":"foo"},{"id":2,"name":"bar"},{"id":3,"name":"baz"}]"#)]
+    #[case(dataframe!("id" => [1, 2, 3])?, r#"[{"id":1},{"id":2},{"id":3}]"#)]
+    async fn test_df_to_json_bytes(
+        #[case] df: DataFrame,
+        #[case] expected: &str,
+    ) -> Result<()> {
+        let res = df_to_json_bytes(df).await?;
+        let value: Value = serde_json::from_slice(&res)?;
+        assert_eq!(value.to_string(), expected);
         Ok(())
     }
 }

@@ -483,3 +483,30 @@ async fn test_add_column_to_df() -> Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_df_to_json_bytes() -> Result<()> {
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "name" => ["foo", "bar", "baz"]
+    )?;
+    let json_data = df_to_json_bytes(df).await?;
+    let json_rows: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice())?;
+
+    assert_eq!(
+        serde_json::Value::Object(json_rows[0].clone()),
+        serde_json::json!({"id": 1, "name": "foo"}),
+    );
+
+    assert_eq!(
+        serde_json::Value::Object(json_rows[1].clone()),
+        serde_json::json!({"id": 2, "name": "bar"}),
+    );
+
+    assert_eq!(
+        serde_json::Value::Object(json_rows[2].clone()),
+        serde_json::json!({"id": 3, "name": "baz"}),
+    );
+
+    Ok(())
+}
