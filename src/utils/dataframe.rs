@@ -438,6 +438,19 @@ pub fn df_plan_to_table(
     Ok(())
 }
 
+/// Convert dataframe to json like data that can be used later to store as string
+pub async fn df_to_json_bytes(df: DataFrame) -> Result<Vec<u8>, UtilsError>{
+    let batches = df.collect().await?;
+    let buf = vec![];
+    let mut writer = arrow_json::ArrayWriter::new(buf);
+    for batch in batches {
+        writer.write(&batch)?;
+    }
+    writer.finish()?;
+    let data = writer.into_inner();
+    Ok(data)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -734,6 +747,33 @@ mod tests {
         assert!(err_msg.contains(
             "Invalid argument error: must either specify a row count or at least one column"
         ));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_df_to_json_bytes() -> Result<()> {
+        let df = dataframe!(
+            "id" => [1, 2, 3],
+            "name" => ["foo", "bar", "baz"]
+        )?;
+        let json_data = df_to_json_bytes(df).await?;
+        let json_rows: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice())?;
+
+        assert_eq!(
+            serde_json::Value::Object(json_rows[0].clone()),
+            serde_json::json!({"id": 1, "name": "foo"}),
+        );
+
+        assert_eq!(
+            serde_json::Value::Object(json_rows[1].clone()),
+            serde_json::json!({"id": 2, "name": "bar"}),
+        );
+
+        assert_eq!(
+            serde_json::Value::Object(json_rows[2].clone()),
+            serde_json::json!({"id": 3, "name": "baz"}),
+        );
+
         Ok(())
     }
 }
