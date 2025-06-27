@@ -1,6 +1,6 @@
 use std::hint::black_box;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use datafusion::prelude::*;
 use tokio::runtime::Runtime;
 
@@ -12,7 +12,8 @@ fn bench_this(c: &mut Criterion) {
         "id" => [1, 2, 3],
         "name" => ["foo", "bar", "baz"],
         "data" => [42, 43, 44]
-    )).unwrap();
+    ))
+    .unwrap();
     let cols = black_box(&["id", "name", "data"]);
 
     c.bench_function("df_cols_to_json", |b| {

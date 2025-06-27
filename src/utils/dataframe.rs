@@ -455,7 +455,7 @@ pub fn df_plan_to_table(
 /// # Ok(())
 /// # }
 /// ```
-pub async fn df_to_json_bytes(df: DataFrame) -> Result<Vec<u8>, UtilsError>{
+pub async fn df_to_json_bytes(df: DataFrame) -> Result<Vec<u8>, UtilsError> {
     let batches = df.collect().await?;
     let buf = vec![];
     let mut writer = arrow_json::ArrayWriter::new(buf);
@@ -771,10 +771,7 @@ mod tests {
     #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, r#"[{"data":42,"id":1,"name":"foo"},{"data":43,"id":2,"name":"bar"},{"data":44,"id":3,"name":"baz"}]"#)]
     #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, r#"[{"id":1,"name":"foo"},{"id":2,"name":"bar"},{"id":3,"name":"baz"}]"#)]
     #[case(dataframe!("id" => [1, 2, 3])?, r#"[{"id":1},{"id":2},{"id":3}]"#)]
-    async fn test_df_to_json_bytes(
-        #[case] df: DataFrame,
-        #[case] expected: &str,
-    ) -> Result<()> {
+    async fn test_df_to_json_bytes(#[case] df: DataFrame, #[case] expected: &str) -> Result<()> {
         let res = df_to_json_bytes(df).await?;
         let value: Value = serde_json::from_slice(&res)?;
         assert_eq!(value.to_string(), expected);

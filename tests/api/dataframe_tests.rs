@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use color_eyre::Result;
 use datafusion::arrow::array::{
-    Array, ArrayRef, Float64Array, Int32Array, RecordBatch, StringArray,
+    Array, ArrayRef, Float64Array, Int32Array, ListArray, RecordBatch, StringArray,
 };
-use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use datafusion::arrow::datatypes::{DataType, Field, Int32Type, Schema};
 use datafusion::assert_batches_eq;
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::prelude::*;
@@ -477,6 +477,43 @@ async fn test_add_column_to_df() -> Result<()> {
             "| 2  | 43   | bar  | 43.0 |",
             "| 3  | 44   | baz  | 44.0 |",
             "+----+------+------+------+",
+        ],
+        &rows.collect().await?
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_add_list_column_to_df() -> Result<()> {
+    let ctx = SessionContext::new();
+    let df = dataframe!(
+        "id" => [1, 2, 3],
+        "name" => ["foo", "bar", "baz"]
+    )?;
+
+    let data: Vec<Option<Vec<Option<i32>>>> = vec![None; 3];
+    let list_array: ArrayRef = Arc::new(ListArray::from_iter_primitive::<Int32Type, _, _>(data));
+    let df = add_column_to_df(&ctx, df, list_array, "col1").await?;
+
+    let data = vec![
+        Some(vec![Some(0), Some(1), Some(2)]),
+        None,
+        Some(vec![Some(3), None, Some(4)]),
+    ];
+    let list_array: ArrayRef = Arc::new(ListArray::from_iter_primitive::<Int32Type, _, _>(data));
+    let res = add_column_to_df(&ctx, df, list_array, "col2").await?;
+
+    let rows = res.sort(vec![col("id").sort(true, true)])?;
+    assert_batches_eq!(
+        &[
+            "+----+------+------+-----------+",
+            "| id | name | col1 | col2      |",
+            "+----+------+------+-----------+",
+            "| 1  | foo  |      | [0, 1, 2] |",
+            "| 2  | bar  |      |           |",
+            "| 3  | baz  |      | [3, , 4]  |",
+            "+----+------+------+-----------+",
         ],
         &rows.collect().await?
     );
