@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use color_eyre::Result;
 use datafusion::arrow::array::{
-    Array, ArrayRef, Float64Array, Int32Array, ListArray, RecordBatch, StringArray,
+    Array, ArrayRef, BooleanArray, Float64Array, Int32Array, ListArray, RecordBatch, StringArray
 };
 use datafusion::arrow::datatypes::{DataType, Field, Int32Type, Schema};
 use datafusion::assert_batches_eq;
@@ -464,19 +464,21 @@ async fn test_add_column_to_df() -> Result<()> {
 
     let col1: ArrayRef = Arc::new(StringArray::from(vec!["foo", "bar", "baz"]));
     let col2: ArrayRef = Arc::new(Float64Array::from(vec![42.0, 43.0, 44.0]));
+    let col3: ArrayRef = Arc::new(BooleanArray::from(vec![Some(true), None, Some(false)]));
     let df = add_column_to_df(&ctx, df, col1, "col1").await?;
-    let res = add_column_to_df(&ctx, df, col2, "col2").await?;
+    let df = add_column_to_df(&ctx, df, col2, "col2").await?;
+    let res = add_column_to_df(&ctx, df, col3, "col3").await?;
 
     let rows = res.sort(vec![col("id").sort(true, true)])?;
     assert_batches_eq!(
         &[
-            "+----+------+------+------+",
-            "| id | data | col1 | col2 |",
-            "+----+------+------+------+",
-            "| 1  | 42   | foo  | 42.0 |",
-            "| 2  | 43   | bar  | 43.0 |",
-            "| 3  | 44   | baz  | 44.0 |",
-            "+----+------+------+------+",
+            "+----+------+------+------+-------+",
+            "| id | data | col1 | col2 | col3  |",
+            "+----+------+------+------+-------+",
+            "| 1  | 42   | foo  | 42.0 | true  |",
+            "| 2  | 43   | bar  | 43.0 |       |",
+            "| 3  | 44   | baz  | 44.0 | false |",
+            "+----+------+------+------+-------+",
         ],
         &rows.collect().await?
     );
