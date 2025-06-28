@@ -462,60 +462,35 @@ async fn test_add_column_to_df() -> Result<()> {
         "data" => [42, 43, 44]
     )?;
 
-    let col1: ArrayRef = Arc::new(StringArray::from(vec!["foo", "bar", "baz"]));
-    let col2: ArrayRef = Arc::new(Float64Array::from(vec![42.0, 43.0, 44.0]));
-    let col3: ArrayRef = Arc::new(BooleanArray::from(vec![Some(true), None, Some(false)]));
-    let df = add_column_to_df(&ctx, df, col1, "col1").await?;
-    let df = add_column_to_df(&ctx, df, col2, "col2").await?;
-    let res = add_column_to_df(&ctx, df, col3, "col3").await?;
-
-    let rows = res.sort(vec![col("id").sort(true, true)])?;
-    assert_batches_eq!(
-        &[
-            "+----+------+------+------+-------+",
-            "| id | data | col1 | col2 | col3  |",
-            "+----+------+------+------+-------+",
-            "| 1  | 42   | foo  | 42.0 | true  |",
-            "| 2  | 43   | bar  | 43.0 |       |",
-            "| 3  | 44   | baz  | 44.0 | false |",
-            "+----+------+------+------+-------+",
-        ],
-        &rows.collect().await?
-    );
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_add_list_column_to_df() -> Result<()> {
-    let ctx = SessionContext::new();
-    let df = dataframe!(
-        "id" => [1, 2, 3],
-        "name" => ["foo", "bar", "baz"]
-    )?;
-
-    let data: Vec<Option<Vec<Option<i32>>>> = vec![None; 3];
-    let list_array: ArrayRef = Arc::new(ListArray::from_iter_primitive::<Int32Type, _, _>(data));
-    let df = add_column_to_df(&ctx, df, list_array, "col1").await?;
-
-    let data = vec![
+    let col0: ArrayRef = Arc::new(Int32Array::from(vec![10, 100, 1000])); // add int array
+    let col1: ArrayRef = Arc::new(StringArray::from(vec!["foo", "bar", "baz"])); // add str array
+    let col2: ArrayRef = Arc::new(Float64Array::from(vec![42.0, 43.0, 44.0])); // add float array
+    let col3: ArrayRef = Arc::new(BooleanArray::from(vec![Some(true), None, Some(false)])); // add bools array
+    let data1: Vec<Option<Vec<Option<i32>>>> = vec![None; 3]; // add list array of nulls
+    let col4: ArrayRef = Arc::new(ListArray::from_iter_primitive::<Int32Type, _, _>(data1));
+    let data2 = vec![ // add list array
         Some(vec![Some(0), Some(1), Some(2)]),
         None,
         Some(vec![Some(3), None, Some(4)]),
     ];
-    let list_array: ArrayRef = Arc::new(ListArray::from_iter_primitive::<Int32Type, _, _>(data));
-    let res = add_column_to_df(&ctx, df, list_array, "col2").await?;
+    let col5: ArrayRef = Arc::new(ListArray::from_iter_primitive::<Int32Type, _, _>(data2));
+    let df = add_column_to_df(&ctx, df, col0, "col0").await?;
+    let df = add_column_to_df(&ctx, df, col1, "col1").await?;
+    let df = add_column_to_df(&ctx, df, col2, "col2").await?;
+    let df = add_column_to_df(&ctx, df, col3, "col3").await?;
+    let df = add_column_to_df(&ctx, df, col4, "col4").await?;
+    let res = add_column_to_df(&ctx, df, col5, "col5").await?;
 
     let rows = res.sort(vec![col("id").sort(true, true)])?;
     assert_batches_eq!(
         &[
-            "+----+------+------+-----------+",
-            "| id | name | col1 | col2      |",
-            "+----+------+------+-----------+",
-            "| 1  | foo  |      | [0, 1, 2] |",
-            "| 2  | bar  |      |           |",
-            "| 3  | baz  |      | [3, , 4]  |",
-            "+----+------+------+-----------+",
+            "+----+------+------+------+------+-------+------+-----------+",
+            "| id | data | col0 | col1 | col2 | col3  | col4 | col5      |",
+            "+----+------+------+------+------+-------+------+-----------+",
+            "| 1  | 42   | 10   | foo  | 42.0 | true  |      | [0, 1, 2] |",
+            "| 2  | 43   | 100  | bar  | 43.0 |       |      |           |",
+            "| 3  | 44   | 1000 | baz  | 44.0 | false |      | [3, , 4]  |",
+            "+----+------+------+------+------+-------+------+-----------+",
         ],
         &rows.collect().await?
     );
