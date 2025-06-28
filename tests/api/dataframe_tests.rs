@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use color_eyre::Result;
 use datafusion::arrow::array::{
-    Array, ArrayRef, BooleanArray, Float64Array, Int32Array, ListArray, RecordBatch, StringArray
+    Array, ArrayRef, BooleanArray, Float64Array, Int32Array, ListArray, RecordBatch, StringArray, StructArray
 };
 use datafusion::arrow::datatypes::{DataType, Field, Int32Type, Schema};
 use datafusion::assert_batches_eq;
@@ -467,30 +467,41 @@ async fn test_add_column_to_df() -> Result<()> {
     let col2: ArrayRef = Arc::new(Float64Array::from(vec![42.0, 43.0, 44.0])); // add float array
     let col3: ArrayRef = Arc::new(BooleanArray::from(vec![Some(true), None, Some(false)])); // add bools array
     let data1: Vec<Option<Vec<Option<i32>>>> = vec![None; 3]; // add list array of nulls
-    let col4: ArrayRef = Arc::new(ListArray::from_iter_primitive::<Int32Type, _, _>(data1));
+    let col4: ArrayRef = Arc::new(ListArray::from_iter_primitive::<Int32Type, _, _>(data1)); 
     let data2 = vec![ // add list array
         Some(vec![Some(0), Some(1), Some(2)]),
         None,
         Some(vec![Some(3), None, Some(4)]),
     ];
     let col5: ArrayRef = Arc::new(ListArray::from_iter_primitive::<Int32Type, _, _>(data2));
+    let col6: ArrayRef = Arc::new(StructArray::from(vec![ // add struct array
+        (
+            Arc::new(Field::new("a", DataType::Utf8, false)),
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef,
+        ),
+        (
+            Arc::new(Field::new("b", DataType::Int32, false)),
+            Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef,
+        ),
+    ]));
     let df = add_column_to_df(&ctx, df, col0, "col0").await?;
     let df = add_column_to_df(&ctx, df, col1, "col1").await?;
     let df = add_column_to_df(&ctx, df, col2, "col2").await?;
     let df = add_column_to_df(&ctx, df, col3, "col3").await?;
     let df = add_column_to_df(&ctx, df, col4, "col4").await?;
-    let res = add_column_to_df(&ctx, df, col5, "col5").await?;
+    let df = add_column_to_df(&ctx, df, col5, "col5").await?;
+    let res = add_column_to_df(&ctx, df, col6, "col6").await?;
 
     let rows = res.sort(vec![col("id").sort(true, true)])?;
     assert_batches_eq!(
         &[
-            "+----+------+------+------+------+-------+------+-----------+",
-            "| id | data | col0 | col1 | col2 | col3  | col4 | col5      |",
-            "+----+------+------+------+------+-------+------+-----------+",
-            "| 1  | 42   | 10   | foo  | 42.0 | true  |      | [0, 1, 2] |",
-            "| 2  | 43   | 100  | bar  | 43.0 |       |      |           |",
-            "| 3  | 44   | 1000 | baz  | 44.0 | false |      | [3, , 4]  |",
-            "+----+------+------+------+------+-------+------+-----------+",
+            "+----+------+------+------+------+-------+------+-----------+-----------------+",
+            "| id | data | col0 | col1 | col2 | col3  | col4 | col5      | col6            |",
+            "+----+------+------+------+------+-------+------+-----------+-----------------+",
+            "| 1  | 42   | 10   | foo  | 42.0 | true  |      | [0, 1, 2] | {a: foo, b: 42} |",
+            "| 2  | 43   | 100  | bar  | 43.0 |       |      |           | {a: bar, b: 43} |",
+            "| 3  | 44   | 1000 | baz  | 44.0 | false |      | [3, , 4]  | {a: baz, b: 44} |",
+            "+----+------+------+------+------+-------+------+-----------+-----------------+",
         ],
         &rows.collect().await?
     );
