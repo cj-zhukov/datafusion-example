@@ -8,7 +8,7 @@ use datafusion::arrow::datatypes::{DataType, Field, Int32Type, Schema};
 use datafusion::assert_batches_eq;
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::prelude::*;
-use datafusion_example::utils::helpers::select_all_exclude;
+use datafusion_example::utils::helpers::{get_empty_df, select_all_exclude};
 use serde_json::{Map, Value};
 use tempfile::tempdir;
 

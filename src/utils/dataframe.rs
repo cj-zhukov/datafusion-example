@@ -1,6 +1,7 @@
 use std::io::Cursor;
 use std::sync::Arc;
 
+use color_eyre::eyre::Report;
 use datafusion::arrow::array::{ArrayRef, StringArray, StructArray};
 use datafusion::arrow::compute::{concat, concat_batches};
 use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef};
@@ -10,6 +11,7 @@ use datafusion::datasource::{MemTable, ViewTable};
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::prelude::*;
+use futures_util::future::try_join_all;
 use futures_util::TryStreamExt;
 use parquet::arrow::{AsyncArrowWriter, ParquetRecordBatchStreamBuilder};
 use serde_json::{Map, Value};
@@ -18,31 +20,6 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_stream::StreamExt;
 
 use crate::error::UtilsError;
-
-/// Get empty dataframe
-/// # Examples
-/// ```
-/// # use color_eyre::Result;
-/// use datafusion::prelude::*;
-/// # use datafusion_example::{utils::dataframe::get_empty_df};
-/// # #[tokio::main]
-/// # async fn main() -> Result<()> {
-/// let ctx = SessionContext::new();
-/// let df = get_empty_df(&ctx)?;
-/// assert_eq!(df.schema().fields().len(), 0); // columns count
-/// assert_eq!(df.count().await?, 0); // rows count
-/// // note, this is different:
-/// let df = ctx.read_empty()?;
-/// assert_eq!(df.schema().fields().len(), 0); // columns count
-/// assert_eq!(df.count().await?, 1); // rows count
-/// # Ok(())
-/// # }
-/// ```
-pub fn get_empty_df(ctx: &SessionContext) -> Result<DataFrame, UtilsError> {
-    let batch = RecordBatch::new_empty(Arc::new(Schema::empty()));
-    let df = ctx.read_batch(batch)?;
-    Ok(df)
-}
 
 /// Query dataframe with sql
 /// # Examples
@@ -128,13 +105,20 @@ pub async fn concat_dfs(
     ctx: &SessionContext,
     dfs: Vec<DataFrame>,
 ) -> Result<DataFrame, UtilsError> {
-    let mut batches = vec![];
-    for df in dfs {
-        let batch = df.collect().await?;
-        batches.extend(batch);
+    if dfs.is_empty() {
+        return Err(UtilsError::UnexpectedError(Report::msg("No dataframes provided")));
     }
+    let batches = collect_batches(dfs).await?;
     let res = ctx.read_batches(batches)?;
     Ok(res)
+}
+
+async fn collect_batches(dfs: Vec<DataFrame>) -> Result<Vec<RecordBatch>, DataFusionError> {
+    try_join_all(
+        dfs.into_iter().map(|df| async move { df.collect().await })
+    )
+    .await
+    .map(|vec_of_batches| vec_of_batches.into_iter().flatten().collect())
 }
 
 /// Create json like string column new_col from cols
@@ -502,6 +486,26 @@ mod tests {
     #[case(dataframe!()?, true)]
     async fn test_is_empty(#[case] df: DataFrame, #[case] expected: bool) -> Result<()> {
         assert_eq!(is_empty(df).await?, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case(vec![dataframe!("id" => [1, 2])?, dataframe!("id" => [3, 4])?], vec![Arc::new(Int32Array::from(vec![1, 2, 3, 4])) as ArrayRef])]
+    #[case(vec![dataframe!("id" => [1, 2])?, dataframe!("id" => [3])?], vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef])]
+    #[case(vec![dataframe!("id" => [1, 2, 3])?, dataframe!("id" => [4])?], vec![Arc::new(Int32Array::from(vec![1, 2, 3, 4])) as ArrayRef])]
+    #[case(vec![dataframe!("name" => ["foo", "bar"])?, dataframe!("name" => ["baz"])?], vec![Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
+    async fn test_concat_dfs(
+        #[case] dfs: Vec<DataFrame>,
+        #[case] expected: Vec<ArrayRef>,
+    ) -> Result<()> {
+        let ctx = SessionContext::new();
+        let df = concat_dfs(&ctx, dfs).await?;
+        let schema = df.schema().as_arrow().clone();
+        let batches = df.collect().await?;
+        let batch = concat_batches(&Arc::new(schema), &batches)?;
+        let arrays: Vec<ArrayRef> = batch.columns().to_vec();
+        assert_eq!(arrays, expected);
         Ok(())
     }
 

@@ -10,6 +10,31 @@ use datafusion::{error::DataFusionError, prelude::*};
 
 use crate::{error::UtilsError, utils::dataframe::concat_arrays};
 
+/// Get empty dataframe
+/// # Examples
+/// ```
+/// # use color_eyre::Result;
+/// use datafusion::prelude::*;
+/// # use datafusion_example::{utils::helpers::get_empty_df};
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
+/// let ctx = SessionContext::new();
+/// let df = get_empty_df(&ctx)?;
+/// assert_eq!(df.schema().fields().len(), 0); // columns count
+/// assert_eq!(df.count().await?, 0); // rows count
+/// // note, this is different:
+/// let df = ctx.read_empty()?;
+/// assert_eq!(df.schema().fields().len(), 0); // columns count
+/// assert_eq!(df.count().await?, 1); // rows count
+/// # Ok(())
+/// # }
+/// ```
+pub fn get_empty_df(ctx: &SessionContext) -> Result<DataFrame, UtilsError> {
+    let batch = RecordBatch::new_empty(Arc::new(Schema::empty()));
+    let df = ctx.read_batch(batch)?;
+    Ok(df)
+}
+
 /// Add auto-increment column to dataframe
 /// # Examples
 /// ```
