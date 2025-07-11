@@ -9,6 +9,7 @@ use aws_sdk_s3::operation::get_object::GetObjectOutput;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use awscreds::Credentials;
+use bytes::Bytes;
 use color_eyre::eyre::{ContextCompat, Report};
 use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::datatypes::Schema;
@@ -249,10 +250,10 @@ pub async fn write_big_df_to_s3(
         .upload_id()
         .ok_or_else(|| UtilsError::UnexpectedError(Report::msg("missing upload_id")))?;
 
-    let parts: Vec<(usize, Vec<u8>)> = buf
+    let parts: Vec<(usize, Bytes)> = buf
         .chunks(CHUNK_SIZE)
         .enumerate()
-        .map(|(i, chunk)| (i + 1, chunk.to_vec()))
+        .map(|(i, chunk)| (i + 1, Bytes::copy_from_slice(chunk)))
         .collect();
 
     let semaphore = Arc::new(Semaphore::new(max_workers));
@@ -276,7 +277,7 @@ pub async fn write_big_df_to_s3(
                 .key(key)
                 .upload_id(upload_id.clone())
                 .part_number(part_number as i32)
-                .body(ByteStream::from(chunk))
+                .body(ByteStream::from(chunk.clone()))
                 .send()
                 .await?;
 
@@ -340,11 +341,12 @@ pub async fn write_batches_to_s3(
 
     let upload_id = multipart_upload_res
         .upload_id()
-        .wrap_err(format!("failed get upload_id for key: {}", key))
-        .map_err(UtilsError::UnexpectedError)?;
+        .ok_or_else(|| UtilsError::UnexpectedError(Report::msg("missing upload_id")))?;
+    
     let mut upload_parts: Vec<CompletedPart> = Vec::new();
     let mut stream = ByteStream::from(buf);
     let mut part_number = 1;
+
     while let Some(bytes) = stream.next().await {
         let bytes = bytes?;
         let upload_part_res = client
