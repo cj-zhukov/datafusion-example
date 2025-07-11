@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use color_eyre::Result;
 use datafusion::arrow::array::{
-    Array, ArrayRef, BooleanArray, Float64Array, Int32Array, ListArray, RecordBatch, StringArray, StructArray
+    Array, ArrayRef, BooleanArray, Float64Array, Int32Array, ListArray, RecordBatch, StringArray,
+    StructArray,
 };
 use datafusion::arrow::datatypes::{DataType, Field, Int32Type, Schema};
 use datafusion::assert_batches_eq;
@@ -467,14 +468,16 @@ async fn test_add_column_to_df() -> Result<()> {
     let col2: ArrayRef = Arc::new(Float64Array::from(vec![42.0, 43.0, 44.0])); // add float array
     let col3: ArrayRef = Arc::new(BooleanArray::from(vec![Some(true), None, Some(false)])); // add bools array
     let data1: Vec<Option<Vec<Option<i32>>>> = vec![None; 3]; // add list array of nulls
-    let col4: ArrayRef = Arc::new(ListArray::from_iter_primitive::<Int32Type, _, _>(data1)); 
-    let data2 = vec![ // add list array
+    let col4: ArrayRef = Arc::new(ListArray::from_iter_primitive::<Int32Type, _, _>(data1));
+    let data2 = vec![
+        // add list array
         Some(vec![Some(0), Some(1), Some(2)]),
         None,
         Some(vec![Some(3), None, Some(4)]),
     ];
     let col5: ArrayRef = Arc::new(ListArray::from_iter_primitive::<Int32Type, _, _>(data2));
-    let col6: ArrayRef = Arc::new(StructArray::from(vec![ // add struct array
+    let col6: ArrayRef = Arc::new(StructArray::from(vec![
+        // add struct array
         (
             Arc::new(Field::new("a", DataType::Utf8, false)),
             Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef,

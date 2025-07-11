@@ -11,8 +11,8 @@ use datafusion::datasource::{MemTable, ViewTable};
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::prelude::*;
-use futures_util::future::try_join_all;
 use futures_util::TryStreamExt;
+use futures_util::future::try_join_all;
 use parquet::arrow::{AsyncArrowWriter, ParquetRecordBatchStreamBuilder};
 use serde_json::{Map, Value};
 use tokio::fs::File;
@@ -106,7 +106,9 @@ pub async fn concat_dfs(
     dfs: Vec<DataFrame>,
 ) -> Result<DataFrame, UtilsError> {
     if dfs.is_empty() {
-        return Err(UtilsError::UnexpectedError(Report::msg("No dataframes provided")));
+        return Err(UtilsError::UnexpectedError(Report::msg(
+            "No dataframes provided",
+        )));
     }
     let batches = collect_batches(dfs).await?;
     let res = ctx.read_batches(batches)?;
@@ -114,11 +116,9 @@ pub async fn concat_dfs(
 }
 
 async fn collect_batches(dfs: Vec<DataFrame>) -> Result<Vec<RecordBatch>, DataFusionError> {
-    try_join_all(
-        dfs.into_iter().map(|df| async move { df.collect().await })
-    )
-    .await
-    .map(|vec_of_batches| vec_of_batches.into_iter().flatten().collect())
+    try_join_all(dfs.into_iter().map(|df| async move { df.collect().await }))
+        .await
+        .map(|vec_of_batches| vec_of_batches.into_iter().flatten().collect())
 }
 
 /// Create json like string column new_col from cols
