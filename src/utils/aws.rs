@@ -10,7 +10,7 @@ use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use awscreds::Credentials;
 use bytes::Bytes;
-use color_eyre::eyre::{ContextCompat, Report};
+use color_eyre::eyre::Report;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::datatypes::Schema;
 use datafusion::dataframe::DataFrameWriteOptions;
@@ -18,15 +18,14 @@ use datafusion::prelude::*;
 use futures_util::TryStreamExt;
 use object_store::aws::AmazonS3Builder;
 use parquet::arrow::{AsyncArrowWriter, ParquetRecordBatchStreamBuilder};
+use tokio::io::AsyncReadExt;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 use tokio_stream::StreamExt;
 use url::Url;
 
 use crate::error::UtilsError;
-
-const AWS_MAX_RETRIES: u32 = 10;
-const CHUNK_SIZE: usize = 10 * 1024 * 1024; // 10 MB
+use crate::utils::constants::*;
 
 pub async fn get_aws_client(region: String) -> Client {
     let region = Region::new(region);
@@ -61,6 +60,91 @@ pub async fn read_file(client: &Client, bucket: &str, key: &str) -> Result<Vec<u
     let mut object = get_aws_object(client, bucket, key).await?;
     while let Some(bytes) = object.body.try_next().await? {
         buf.extend(bytes.to_vec());
+    }
+    Ok(buf)
+}
+
+/// Get file from AWS S3 based on file size
+pub async fn read_file2(
+    client: &Client,
+    bucket: &str,
+    key: &str,
+    chunk_suze: Option<u64>,
+) -> Result<Vec<u8>, UtilsError> {
+    let object = get_aws_object(client, bucket, key).await?;
+    let length = object.content_length().unwrap_or(0) as u64;
+    let mut body = object.body;
+    if length <= chunk_suze.unwrap_or(CHUNK_SIZE) {
+        let mut buf = Vec::with_capacity(length as usize);
+        let mut reader = body.into_async_read();
+        reader.read_to_end(&mut buf).await?;
+        Ok(buf)
+    } else {
+        let mut buf = Vec::with_capacity(length as usize);
+        while let Some(chunk) = body.try_next().await? {
+            buf.extend_from_slice(&chunk);
+        }
+        Ok(buf)
+    }
+}
+
+/// Get file from AWS S3 by reading chunks in parallel
+pub async fn read_file_big(
+    client: &Client,
+    bucket: &str,
+    key: &str,
+    chunk_size: Option<u64>,
+    chunks_workers: Option<usize>,
+) -> Result<Vec<u8>, UtilsError> {
+    let object = get_aws_object(client, bucket, key).await?;
+    let size = object.content_length().unwrap_or(0) as u64;
+    let mut ranges = vec![];
+    for start in (0..size).step_by(chunk_size.unwrap_or(CHUNK_SIZE) as usize) {
+        let end = (start + chunk_size.unwrap_or(CHUNK_SIZE) - 1).min(size - 1);
+        ranges.push((start, end));
+    }
+
+    let semaphore = Arc::new(Semaphore::new(chunks_workers.unwrap_or(CHUNKS_WORKERS)));
+    let mut tasks = vec![];
+    let ranges_len = ranges.clone().len();
+    for (i, (start, end)) in ranges.into_iter().enumerate() {
+        let client = client.clone();
+        let bucket = bucket.to_string();
+        let key = key.to_string();
+        let permit = semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .map_err(|e| UtilsError::UnexpectedError(e.into()))?;
+
+        tasks.push(tokio::spawn(async move {
+            let _permit = permit;
+            let range = format!("bytes={}-{}", start, end);
+            let out = client
+                .get_object()
+                .bucket(&bucket)
+                .key(&key)
+                .range(range)
+                .send()
+                .await?;
+            let bytes = out.body.collect().await?.into_bytes();
+            Ok::<(usize, Bytes), UtilsError>((i, bytes))
+        }));
+    }
+
+    let mut results = vec![Bytes::new(); ranges_len];
+    for task in tasks {
+        let (i, chunk) = task
+            .await
+            .map_err(|e| UtilsError::UnexpectedError(e.into()))?
+            .map_err(|e| UtilsError::UnexpectedError(e.into()))?;
+        results[i] = chunk;
+    }
+
+    let total_size: usize = results.iter().map(|b| b.len()).sum();
+    let mut buf = Vec::with_capacity(total_size);
+    for chunk in results {
+        buf.extend_from_slice(&chunk);
     }
     Ok(buf)
 }
@@ -251,7 +335,7 @@ pub async fn write_big_df_to_s3(
         .ok_or_else(|| UtilsError::UnexpectedError(Report::msg("missing upload_id")))?;
 
     let parts: Vec<(usize, Bytes)> = buf
-        .chunks(CHUNK_SIZE)
+        .chunks(CHUNK_SIZE as usize)
         .enumerate()
         .map(|(i, chunk)| (i + 1, Bytes::copy_from_slice(chunk)))
         .collect();
@@ -342,7 +426,7 @@ pub async fn write_batches_to_s3(
     let upload_id = multipart_upload_res
         .upload_id()
         .ok_or_else(|| UtilsError::UnexpectedError(Report::msg("missing upload_id")))?;
-    
+
     let mut upload_parts: Vec<CompletedPart> = Vec::new();
     let mut stream = ByteStream::from(buf);
     let mut part_number = 1;
