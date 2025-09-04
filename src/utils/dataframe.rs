@@ -53,10 +53,13 @@ pub async fn df_sql(df: DataFrame, sql: &str) -> Result<DataFrame, UtilsError> {
 
 /// Check if dataframe is empty and doesn't have rows
 pub async fn is_empty(df: DataFrame) -> Result<bool, UtilsError> {
-    let is_empty_schema = df.schema().fields().is_empty();
-    let batches = df.collect().await?;
-    let is_empty = batches.iter().all(|batch| batch.num_rows() == 0);
-    Ok(is_empty && is_empty_schema)
+    let mut stream = df.execute_stream().await?;
+    if let Some(batch) = stream.next().await.transpose()? {
+        if batch.num_rows() > 0 {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 /// Returns column names if the schema is not empty.
