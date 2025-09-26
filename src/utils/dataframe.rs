@@ -512,6 +512,52 @@ pub async fn df_to_json_bytes(df: DataFrame) -> Result<Vec<u8>, UtilsError> {
     Ok(data)
 }
 
+/// Join dataframes using same column name,
+/// right columns used by join will be removed
+/// # Examples
+/// ```
+/// # use color_eyre::Result;
+/// use datafusion::prelude::*;
+/// use serde_json::Value;
+/// # use datafusion_example::utils::dataframe::join_dfs;
+/// # fn main() -> Result<()> {
+/// let df1 = dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?;
+/// let df2 = dataframe!("id" => [1, 2, 3],"data" => [42, 43, 44])?;
+/// let res = join_dfs(vec![df1, df2], &["id"])?;
+/// // +----+------+------+
+/// // | id | name | data |
+/// // +----+------+------+
+/// // | 1  | foo  | 42   |
+/// // | 2  | bar  | 43   |
+/// // | 3  | baz  | 44   |
+/// // +----+------+------+
+/// # Ok(())
+/// # }
+/// ```
+pub fn join_dfs(dfs: Vec<DataFrame>, columns: &[&str]) -> Result<DataFrame, UtilsError> {
+    let mut iter = dfs.into_iter();
+
+    let mut res = match iter.next() {
+        Some(df) => df,
+        None => return Err(UtilsError::UnexpectedError(Report::msg("Empty dataframe"))),
+    };
+
+    for (i, mut df) in iter.enumerate() {
+        let rhs_columns: Vec<String> = columns.iter().map(|c| format!("{c}_rhs{i}")).collect();
+
+        for (old, new) in columns.iter().zip(&rhs_columns) {
+            df = df.with_column_renamed(*old, new)?;
+        }
+
+        let rhs_refs: Vec<&str> = rhs_columns.iter().map(|c| c.as_str()).collect();
+        res = res
+            .join(df, JoinType::Inner, columns, &rhs_refs, None)?
+            .drop_columns(&rhs_refs)?;
+    }
+
+    Ok(res)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -861,6 +907,23 @@ mod tests {
         let res = df_to_json_bytes(df).await?;
         let value: Value = serde_json::from_slice(&res)?;
         assert_eq!(value.to_string(), expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case(vec![dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, dataframe!("id" => [1, 2, 3],"data" => [42, 43, 44])?], &["id"], vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef])]
+    #[case(vec![dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"value" => ["foo", "bar", "baz"])?, dataframe!("id" => [1, 2, 3],"data" => [42, 43, 44])?], &["id"], vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef])]
+    #[case(vec![dataframe!("id" => [1, 2, 3],"pk" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, dataframe!("id" => [1, 2, 3],"pk" => [1, 2, 3],"data" => [42, 43, 44])?], &["id", "pk"], vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef])]
+    async fn test_join_dfs(
+        #[case] dfs: Vec<DataFrame>,
+        #[case] columns: &[&str],
+        #[case] expected: Vec<ArrayRef>,
+    ) -> Result<()> {
+        let res = join_dfs(dfs, columns)?;
+        let batch = concat_df_batches(res).await?;
+        let arrays: Vec<ArrayRef> = batch.columns().to_vec();
+        assert_eq!(arrays, expected);
         Ok(())
     }
 }

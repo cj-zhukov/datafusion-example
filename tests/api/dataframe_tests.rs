@@ -538,3 +538,43 @@ async fn test_df_to_json_bytes() -> Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_join_dfs() -> Result<()> {
+    let df1 = dataframe!(
+        "id" => [1, 2, 3],
+        "pk" => [1, 2, 3],
+        "name" => ["foo", "bar", "baz"],
+        "data" => [42., 43., 44.]
+    )?;
+    let df2 = dataframe!(
+        "id" => [1, 2, 3],
+        "pk" => [1, 2, 3],
+        "value" => [true, true, false]
+    )?;
+    let df3 = dataframe!(
+        "id" => [1, 2, 3],
+        "pk" => [1, 2, 3],
+        "nums" => [42, 42, 42]
+    )?;
+    let df4 = dataframe!(
+        "id" => [1, 2, 3],
+        "pk" => [1, 2, 3],
+        "store" => [1, 10, 100]
+    )?;
+    let res = join_dfs(vec![df1, df2, df3, df4], &["id", "pk"])?;
+    let rows = res.sort(vec![col("id").sort(true, true)])?;
+    assert_batches_eq!(
+        &[
+            "+----+----+------+------+-------+------+-------+",
+            "| id | pk | name | data | value | nums | store |",
+            "+----+----+------+------+-------+------+-------+",
+            "| 1  | 1  | foo  | 42.0 | true  | 42   | 1     |",
+            "| 2  | 2  | bar  | 43.0 | true  | 42   | 10    |",
+            "| 3  | 3  | baz  | 44.0 | false | 42   | 100   |",
+            "+----+----+------+------+-------+------+-------+",
+        ],
+        &rows.collect().await?
+    );
+    Ok(())
+}
