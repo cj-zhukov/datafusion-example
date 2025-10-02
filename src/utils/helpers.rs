@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use color_eyre::Report;
 use datafusion::arrow::array::{
     Array, ArrayRef, BinaryArray, BooleanArray, Float32Array, Float64Array, GenericByteArray,
     Int32Array, Int64Array, PrimitiveArray, StringArray, StructArray,
@@ -7,6 +8,7 @@ use datafusion::arrow::array::{
 use datafusion::arrow::datatypes::{ArrowPrimitiveType, ByteArrayType, DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::{error::DataFusionError, prelude::*};
+use rand::prelude::*;
 
 use crate::{error::UtilsError, utils::dataframe::concat_arrays};
 
@@ -33,6 +35,85 @@ pub fn get_empty_df(ctx: &SessionContext) -> Result<DataFrame, UtilsError> {
     let batch = RecordBatch::new_empty(Arc::new(Schema::empty()));
     let df = ctx.read_batch(batch)?;
     Ok(df)
+}
+
+/// Get dataframe with random data
+/// # Examples
+/// ```
+/// # use color_eyre::Result;
+/// use datafusion::prelude::*;
+/// use datafusion::arrow::datatypes::DataType;
+/// # use datafusion_example::utils::helpers::get_random_df;
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
+/// let ctx = SessionContext::new();
+/// let df = get_random_df(
+///     &ctx,
+///     &[DataType::Int32, DataType::Int32, DataType::Utf8],
+///     5
+/// )?;
+/// // you will get something like this:
+/// // +-------------+-------------+------------------------------------------------+
+/// // | column_1    | column_2    | column_3                                       |
+/// // +-------------+-------------+------------------------------------------------+
+/// // | -2011004115 | 534224612   | UP                                             |
+/// // | -442279868  | -2017845424 | SFyZO7kiz9aUFX71WzrbFLYpFlurRSs52jK0LsOFnGnf   |
+/// // | 392026153   | -723595830  | E8WbxQcyzOmRXyOba7k3F                          |
+/// // | -1268834036 | -1605973120 | 1ZXlu4amyJGU9nlopXWM0Q1vVbrxeFkVbJSwauztf3W28t |
+/// // | -372071382  | 556199741   | 8KJXlmXf636CYtBQAL8JIXlOnlbXCoVV               |
+/// // +-------------+-------------+------------------------------------------------+
+/// # Ok(())
+/// # }
+/// ```
+pub fn get_random_df(
+    ctx: &SessionContext,
+    types: &[DataType],
+    rows: usize,
+) -> Result<DataFrame, UtilsError> {
+    let cols = types.len();
+    if cols == 0 && rows == 0 {
+        return get_empty_df(ctx);
+    }
+
+    let mut rng = rand::rng();
+    let str_gen = |rng: &mut rand::rngs::ThreadRng| {
+        let num = rng.random_range(1..50);
+        (0..num)
+            .map(|_| rng.sample(rand::distr::Alphanumeric) as char)
+            .collect::<String>()
+    };
+    let int_gen = |rng: &mut rand::rngs::ThreadRng| rng.random::<i32>();
+
+    let mut columns = Vec::with_capacity(cols);
+    for (i, col_type) in types.iter().enumerate() {
+        let col_data = match col_type {
+            DataType::Utf8 => {
+                let data: Vec<String> = (1..=rows).map(|_| str_gen(&mut rng)).collect();
+                let col: ArrayRef = Arc::new(StringArray::from(data));
+                col
+            }
+            DataType::Int32 => {
+                let data: Vec<i32> = (1..=rows).map(|_| int_gen(&mut rng)).collect();
+                let col: ArrayRef = Arc::new(Int32Array::from(data));
+                col
+            }
+            other => {
+                return Err(UtilsError::UnexpectedError(Report::msg(format!(
+                    "Unexpected type provided: {other:?}"
+                ))));
+            }
+        };
+        let col_name = format!("column_{}", i + 1);
+        columns.push((col_name, col_data));
+    }
+
+    let res = DataFrame::from_columns(
+        columns
+            .iter()
+            .map(|(name, col)| (name.as_str(), col.clone()))
+            .collect(),
+    )?;
+    Ok(res)
 }
 
 /// Add auto-increment column to dataframe
@@ -518,6 +599,27 @@ mod tests {
             .downcast_ref::<StructArray>()
             .unwrap();
         let res = extract_struct_array_values(array);
+        assert_eq!(res, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case(&[DataType::Int32], 1, vec![1, 1])]
+    #[case(&[DataType::Int32, DataType::Int32], 2, vec![2, 2])]
+    #[case(&[DataType::Int32, DataType::Int32, DataType::Int32], 3, vec![3, 3])]
+    #[case(&[DataType::Int32, DataType::Int32, DataType::Int32], 4, vec![3, 4])]
+    #[case(&[DataType::Int32, DataType::Int32, DataType::Int32], 5, vec![3, 5])]
+    #[case(&[DataType::Int32, DataType::Int32, DataType::Int32], 10, vec![3, 10])]
+    async fn test_get_random_df(
+        #[case] types: &[DataType],
+        #[case] rows: usize,
+        #[case] expected: Vec<usize>,
+    ) -> Result<()> {
+        let ctx = SessionContext::new();
+        let df = get_random_df(&ctx, types, rows)?;
+        let batch = concat_df_batches(df).await?;
+        let res = vec![batch.num_columns(), batch.num_rows()];
         assert_eq!(res, expected);
         Ok(())
     }
