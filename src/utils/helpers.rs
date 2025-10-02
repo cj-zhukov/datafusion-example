@@ -242,7 +242,8 @@ pub async fn add_col_arr_to_df(
     Ok(res)
 }
 
-/// Select dataframe with all columns except to_exclude (better use drop_columns)
+/// Select dataframe with all columns except to_exclude
+/// (better use [`drop_columns`](https://docs.rs/datafusion/latest/datafusion/dataframe/struct.DataFrame.html#method.drop_columns))
 /// # Examples
 /// ```
 /// use datafusion::prelude::*;
