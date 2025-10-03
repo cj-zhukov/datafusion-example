@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use color_eyre::Report;
 use datafusion::arrow::array::{
     Array, ArrayRef, BinaryArray, BooleanArray, Float32Array, Float64Array, GenericByteArray,
     Int32Array, Int64Array, PrimitiveArray, StringArray, StructArray,
@@ -83,6 +82,8 @@ pub fn get_random_df(
             .collect::<String>()
     };
     let int_gen = |rng: &mut rand::rngs::ThreadRng| rng.random::<i32>();
+    let float_gen = |rng: &mut rand::rngs::ThreadRng| rng.random::<f32>();
+    let bool_gen = |rng: &mut rand::rngs::ThreadRng| rng.random::<bool>();
 
     let mut columns = Vec::with_capacity(cols);
     for (i, col_type) in types.iter().enumerate() {
@@ -91,17 +92,23 @@ pub fn get_random_df(
                 let data: Vec<String> = (1..=rows).map(|_| str_gen(&mut rng)).collect();
                 let col: ArrayRef = Arc::new(StringArray::from(data));
                 col
-            }
+            },
             DataType::Int32 => {
                 let data: Vec<i32> = (1..=rows).map(|_| int_gen(&mut rng)).collect();
                 let col: ArrayRef = Arc::new(Int32Array::from(data));
                 col
-            }
-            other => {
-                return Err(UtilsError::UnexpectedError(Report::msg(format!(
-                    "Unexpected type provided: {other:?}"
-                ))));
-            }
+            },
+            DataType::Float32 => {
+                let data: Vec<f32> = (1..=rows).map(|_| float_gen(&mut rng)).collect();
+                let col: ArrayRef = Arc::new(Float32Array::from(data));
+                col
+            },
+            DataType::Boolean => {
+                let data: Vec<bool> = (1..=rows).map(|_| bool_gen(&mut rng)).collect();
+                let col: ArrayRef = Arc::new(BooleanArray::from(data));
+                col
+            },
+            _ => unimplemented!()
         };
         let col_name = format!("column_{}", i + 1);
         columns.push((col_name, col_data));
