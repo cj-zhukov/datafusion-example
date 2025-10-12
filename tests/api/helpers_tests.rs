@@ -217,7 +217,8 @@ async fn test_get_random_df() -> Result<()> {
 
     let schema = df.schema();
     for (i, expected_type) in expected_types.iter().enumerate() {
-        let field = schema.field(i);
+        let col_name = format!("column_{}", i + 1);
+        let field = schema.field_with_name(None, &col_name)?;
         assert_eq!(field.data_type(), expected_type);
     }
 
