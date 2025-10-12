@@ -131,7 +131,11 @@ impl Foo {
         let mut records = vec![];
         while let Some(batch) = stream.next().await.transpose()? {
             let schema = batch.schema();
-            let columns = schema.fields().iter().map(|f| f.name().clone()).collect::<Vec<_>>();
+            let columns = schema
+                .fields()
+                .iter()
+                .map(|f| f.name().clone())
+                .collect::<Vec<_>>();
 
             // helper closure to get optional StringArray
             let get_string_col = |name: &str| -> Option<&StringArray> {
@@ -166,9 +170,27 @@ impl Foo {
 
             for i in 0..batch.num_rows() {
                 records.push(Self {
-                    id: ids.and_then(|col| if col.is_null(i) { None } else { Some(col.value(i)) }),
-                    name: names.and_then(|col| if col.is_null(i) { None } else { Some(col.value(i).to_string()) }),
-                    data_val: data_vals.and_then(|col| if col.is_null(i) { None } else { Some(col.value(i).to_vec()) }),
+                    id: ids.and_then(|col| {
+                        if col.is_null(i) {
+                            None
+                        } else {
+                            Some(col.value(i))
+                        }
+                    }),
+                    name: names.and_then(|col| {
+                        if col.is_null(i) {
+                            None
+                        } else {
+                            Some(col.value(i).to_string())
+                        }
+                    }),
+                    data_val: data_vals.and_then(|col| {
+                        if col.is_null(i) {
+                            None
+                        } else {
+                            Some(col.value(i).to_vec())
+                        }
+                    }),
                 });
             }
         }

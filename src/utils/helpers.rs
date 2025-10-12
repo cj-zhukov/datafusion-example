@@ -92,23 +92,23 @@ pub fn get_random_df(
                 let data: Vec<String> = (1..=rows).map(|_| str_gen(&mut rng)).collect();
                 let col: ArrayRef = Arc::new(StringArray::from(data));
                 col
-            },
+            }
             DataType::Int32 => {
                 let data: Vec<i32> = (1..=rows).map(|_| int_gen(&mut rng)).collect();
                 let col: ArrayRef = Arc::new(Int32Array::from(data));
                 col
-            },
+            }
             DataType::Float32 => {
                 let data: Vec<f32> = (1..=rows).map(|_| float_gen(&mut rng)).collect();
                 let col: ArrayRef = Arc::new(Float32Array::from(data));
                 col
-            },
+            }
             DataType::Boolean => {
                 let data: Vec<bool> = (1..=rows).map(|_| bool_gen(&mut rng)).collect();
                 let col: ArrayRef = Arc::new(BooleanArray::from(data));
                 col
-            },
-            _ => unimplemented!()
+            }
+            _ => unimplemented!(),
         };
         let col_name = format!("column_{}", i + 1);
         columns.push((col_name, col_data));

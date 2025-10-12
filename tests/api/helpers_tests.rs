@@ -1,5 +1,6 @@
 use color_eyre::Result;
 use datafusion::arrow::array::{Float64Array, Int32Array, LargeStringArray, StringArray};
+use datafusion::arrow::datatypes::DataType;
 use datafusion::assert_batches_eq;
 use datafusion::prelude::*;
 
@@ -196,6 +197,29 @@ async fn test_add_col_arr_to_df() -> Result<()> {
         ],
         &rows.collect().await?
     );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_random_df() -> Result<()> {
+    let ctx = SessionContext::new();
+    let expected_types = vec![
+        DataType::Int32,
+        DataType::Float32,
+        DataType::Utf8,
+        DataType::Boolean,
+    ];
+    let df = get_random_df(&ctx, &expected_types, 5)?;
+
+    assert_eq!(df.schema().fields().len(), 4);
+    assert_eq!(df.clone().count().await?, 5);
+
+    let schema = df.schema();
+    for (i, expected_type) in expected_types.iter().enumerate() {
+        let field = schema.field(i);
+        assert_eq!(field.data_type(), expected_type);
+    }
 
     Ok(())
 }
