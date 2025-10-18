@@ -1,42 +1,37 @@
 use std::{str::FromStr, sync::Arc};
 
-use datafusion::arrow::array::{
-    Array, ArrayRef, BooleanArray, Int32Array, PrimitiveArray, StringArray,
-};
+use datafusion::arrow::array::{ArrayRef, PrimitiveArray, StringArray};
 use datafusion::arrow::datatypes::{ArrowPrimitiveType, DataType, Int32Type, UInt32Type};
 use datafusion::scalar::ScalarValue;
 
 use crate::error::UtilsError;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum ScalarValueNew {
-    Boolean(Option<bool>),
-    Float32(Option<f32>),
-    Float64(Option<f64>),
-    Int8(Option<i8>),
-    Int16(Option<i16>),
-    Int32(Option<i32>),
-    Int64(Option<i64>),
-    UInt8(Option<u8>),
-    UInt16(Option<u16>),
-    UInt32(Option<u32>),
-    UInt64(Option<u64>),
-    Utf8(Option<String>),
-    LargeUtf8(Option<String>),
-    List(Option<Vec<ScalarValue>>, DataType),
-    Date32(Option<i32>),
-    TimeMicrosecond(Option<i64>),
-    TimeNanosecond(Option<i64>),
+/// Converts a single value from an Arrow array into a ScalarValue
+pub fn try_from_array(array: &ArrayRef, index: usize) -> Result<ScalarValue, UtilsError> {
+    ScalarValue::try_from_array(array, index).map_err(|e| UtilsError::from(e))
 }
 
-macro_rules! typed_cast {
-    ($array:expr, $index:expr, $ARRAYTYPE:ident, $SCALAR:ident) => {{
-        let array = $array.as_any().downcast_ref::<$ARRAYTYPE>().unwrap();
-        ScalarValueNew::$SCALAR(match array.is_null($index) {
-            true => None,
-            false => Some(array.value($index).into()),
-        })
-    }};
+/// Parses an iterator of &str into an Arrow ArrayRef of the given DataType.
+/// This uses Arrow primitives directly.
+pub fn parse_strings<'a, I>(iter: I, to_data_type: DataType) -> Result<ArrayRef, UtilsError>
+where
+    I: IntoIterator<Item = &'a str>,
+{
+    match to_data_type {
+        DataType::Int32 => {
+            let arr = parse_to_primitive::<Int32Type, _>(iter);
+            Ok(Arc::new(arr))
+        }
+        DataType::UInt32 => {
+            let arr = parse_to_primitive::<UInt32Type, _>(iter);
+            Ok(Arc::new(arr))
+        }
+        DataType::Utf8 => {
+            let vec: Vec<Option<&str>> = iter.into_iter().map(|v| Some(v)).collect();
+            Ok(Arc::new(StringArray::from(vec)))
+        }
+        _ => unimplemented!(),
+    }
 }
 
 fn parse_to_primitive<'a, T, I>(iter: I) -> PrimitiveArray<T>
@@ -48,24 +43,25 @@ where
     PrimitiveArray::from_iter(iter.into_iter().map(|val| T::Native::from_str(val).ok()))
 }
 
-pub fn parse_strings<'a, I>(iter: I, to_data_type: DataType) -> ArrayRef
-where
-    I: IntoIterator<Item = &'a str>,
-{
-    match to_data_type {
-        DataType::Int32 => Arc::new(parse_to_primitive::<Int32Type, _>(iter)) as _,
-        DataType::UInt32 => Arc::new(parse_to_primitive::<UInt32Type, _>(iter)) as _,
-        _ => unimplemented!(),
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-impl ScalarValueNew {
-    pub fn try_from_array(array: &ArrayRef, index: usize) -> Result<Self, UtilsError> {
-        Ok(match array.data_type() {
-            DataType::Boolean => typed_cast!(array, index, BooleanArray, Boolean),
-            DataType::Int32 => typed_cast!(array, index, Int32Array, Int32),
-            DataType::Utf8 => typed_cast!(array, index, StringArray, Utf8),
-            _ => unimplemented!(),
-        })
+    use color_eyre::Result;
+    use datafusion::arrow::array::{Array, Int32Array};
+
+    #[test]
+    fn test_parse_strings() -> Result<()> {
+        let array = parse_strings(["1", "2", "3"], DataType::Int32)?;
+        let integers = array.as_any().downcast_ref::<Int32Array>().unwrap();
+        let vals = integers.values();
+        assert_eq!(vals, &[1, 2, 3]);
+
+        let array = parse_strings(["foo", "bar", "baz"], DataType::Utf8)?;
+        let strings = array.as_any().downcast_ref::<StringArray>().unwrap();
+        let vals: Vec<_> = (0..strings.len()).map(|i| strings.value(i)).collect();
+        assert_eq!(vals, vec!["foo", "bar", "baz"]);
+
+        Ok(())
     }
 }

@@ -24,7 +24,7 @@ async fn main() -> Result<()> {
     assert1().await?;
     assert2().await?;
     downcast_df().await?;
-    downcast_df2();
+    downcast_df2()?;
 
     Ok(())
 }
@@ -425,8 +425,8 @@ pub async fn downcast_df() -> Result<()> {
     Ok(())
 }
 
-pub fn downcast_df2() {
-    let array = parse_strings(["1", "2", "3"], DataType::Int32);
+pub fn downcast_df2() -> Result<()> {
+    let array = parse_strings(["1", "2", "3"], DataType::Int32)?;
     let integers = array.as_any().downcast_ref::<Int32Array>().unwrap();
     let vals = integers.values();
     assert_eq!(vals, &[1, 2, 3]);
@@ -439,6 +439,7 @@ pub fn downcast_df2() {
     let result = ScalarValue::new_list_from_iter(scalars.into_iter(), &DataType::Int32, true);
     let expected =
         ListArray::from_iter_primitive::<Int32Type, _, _>(vec![Some(vec![Some(1), None, Some(2)])]);
-
     assert_eq!(*result, expected);
+    
+    Ok(())
 }

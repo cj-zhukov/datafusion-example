@@ -5,7 +5,7 @@ use color_eyre::Result;
 use datafusion::arrow::array::{ArrayRef, Int32Array, RecordBatch, StringArray, StructArray};
 use datafusion::arrow::datatypes::{DataType, Field, Fields, Schema};
 use datafusion::prelude::*;
-use datafusion_example::utils::scalarvalue::ScalarValueNew;
+use datafusion::scalar::ScalarValue;
 use itertools::Itertools;
 use serde_json::{Map, Value};
 use tokio_stream::StreamExt;
@@ -349,12 +349,12 @@ pub async fn scalar_new_example() -> Result<()> {
         .select_columns(&["id", "name", "data"])?;
 
     let mut stream = df.execute_stream().await?;
-    let mut columns: HashMap<usize, Vec<ScalarValueNew>> = HashMap::new();
+    let mut columns: HashMap<usize, Vec<ScalarValue>> = HashMap::new();
     while let Some(batch) = stream.next().await.transpose()? {
         for i in 0..batch.num_columns() {
             let arr = batch.column(i);
             for idx in 0..arr.len() {
-                let value = ScalarValueNew::try_from_array(arr, idx)?;
+                let value = ScalarValue::try_from_array(arr, idx)?;
                 let data = vec![value];
                 match columns.get_mut(&i) {
                     Some(val) => {
@@ -371,21 +371,21 @@ pub async fn scalar_new_example() -> Result<()> {
     let mut id_all = vec![];
     let x = columns[&0].clone();
     for column in x {
-        if let ScalarValueNew::Int32(res) = column {
+        if let ScalarValue::Int32(res) = column {
             id_all.push(res);
         }
     }
     let mut name_all = vec![];
     let x = columns[&1].clone();
     for column in x {
-        if let ScalarValueNew::Utf8(res) = column {
+        if let ScalarValue::Utf8(res) = column {
             name_all.push(res);
         }
     }
     let mut data_all = vec![];
     let x = columns[&2].clone();
     for column in x {
-        if let ScalarValueNew::Int32(res) = column {
+        if let ScalarValue::Int32(res) = column {
             data_all.push(res);
         }
     }
