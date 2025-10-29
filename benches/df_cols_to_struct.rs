@@ -16,7 +16,7 @@ fn bench_this(c: &mut Criterion) {
     .unwrap();
     let cols = black_box(&["id", "name", "data"]);
 
-    c.bench_function("df_cols_to_json", |b| {
+    c.bench_function("df_cols_to_struct", |b| {
         b.to_async(Runtime::new().unwrap())
             .iter(|| df_cols_to_struct(&ctx, df.clone(), cols, "new_col"))
     });

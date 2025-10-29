@@ -18,7 +18,7 @@ fn bench_this(c: &mut Criterion) {
     .unwrap();
     let col: ArrayRef = Arc::new(StringArray::from(vec!["foo", "bar", "baz"]));
 
-    c.bench_function("df_cols_to_json", |b| {
+    c.bench_function("add_column_to_df", |b| {
         b.to_async(Runtime::new().unwrap())
             .iter(|| add_column_to_df(&ctx, df.clone(), col.clone(), "new_col"))
     });
