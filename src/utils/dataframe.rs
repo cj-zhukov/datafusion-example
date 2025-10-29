@@ -62,7 +62,25 @@ pub async fn is_empty(df: DataFrame) -> Result<bool, UtilsError> {
     Ok(true)
 }
 
-/// Returns column names if the schema is not empty.
+/// Returns column names if the schema is not empty
+/// # Examples
+/// ```
+/// # use datafusion_example::utils::dataframe::get_column_names;
+/// use datafusion::prelude::*;
+/// let df = dataframe!(
+///     "id" => [1, 2, 3],
+///     "name" => ["foo", "bar", "baz"]
+/// ).unwrap();
+/// // +----+------+,
+/// // | id | name |,
+/// // +----+------+,
+/// // | 1  | foo  |,
+/// // | 2  | bar  |,
+/// // | 3  | baz  |,
+/// // +----+------+,
+/// let columns = get_column_names(&df);
+/// assert_eq!(columns, Some(vec!["id", "name"]));
+/// ```
 pub fn get_column_names(df: &DataFrame) -> Option<Vec<&str>> {
     let fields = df.schema().fields();
     if fields.is_empty() {
