@@ -440,6 +440,6 @@ pub fn downcast_df2() -> Result<()> {
     let expected =
         ListArray::from_iter_primitive::<Int32Type, _, _>(vec![Some(vec![Some(1), None, Some(2)])]);
     assert_eq!(*result, expected);
-    
+
     Ok(())
 }

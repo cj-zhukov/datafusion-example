@@ -52,6 +52,35 @@ pub async fn df_sql(df: DataFrame, sql: &str) -> Result<DataFrame, UtilsError> {
 }
 
 /// Check if dataframe is empty and doesn't have rows
+/// # Examples
+/// ```
+/// # use color_eyre::Result;
+/// # use datafusion_example::utils::dataframe::is_empty;
+/// use datafusion::prelude::*;
+/// # use datafusion::arrow::{array::RecordBatch, datatypes::Schema};
+/// # use std::sync::Arc;
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
+/// let df = dataframe!(
+///     "id" => [1, 2, 3],
+///     "name" => ["foo", "bar", "baz"]
+/// )?;
+/// assert_eq!(is_empty(df).await?, false);
+///
+/// let df = dataframe!("id" => [None::<i32>])?;
+/// assert_eq!(is_empty(df).await?, false);
+///
+/// let df = dataframe!()?;
+/// assert_eq!(is_empty(df).await?, true);
+///
+/// let ctx = SessionContext::new();
+/// let schema = Arc::new(Schema::empty());
+/// let batch = RecordBatch::new_empty(schema);
+/// let df = ctx.read_batch(batch)?;
+/// assert_eq!(is_empty(df).await?, true);
+/// # Ok(())
+/// # }
+/// ```
 pub async fn is_empty(df: DataFrame) -> Result<bool, UtilsError> {
     let mut stream = df.execute_stream().await?;
     if let Some(batch) = stream.next().await.transpose()? {
@@ -66,11 +95,14 @@ pub async fn is_empty(df: DataFrame) -> Result<bool, UtilsError> {
 /// # Examples
 /// ```
 /// # use datafusion_example::utils::dataframe::get_column_names;
+/// # use color_eyre::Result;
 /// use datafusion::prelude::*;
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
 /// let df = dataframe!(
 ///     "id" => [1, 2, 3],
 ///     "name" => ["foo", "bar", "baz"]
-/// ).unwrap();
+/// )?;
 /// // +----+------+,
 /// // | id | name |,
 /// // +----+------+,
@@ -80,6 +112,8 @@ pub async fn is_empty(df: DataFrame) -> Result<bool, UtilsError> {
 /// // +----+------+,
 /// let columns = get_column_names(&df);
 /// assert_eq!(columns, Some(vec!["id", "name"]));
+/// # Ok(())
+/// # }
 /// ```
 pub fn get_column_names(df: &DataFrame) -> Option<Vec<&str>> {
     let fields = df.schema().fields();
@@ -95,6 +129,39 @@ pub fn get_column_names(df: &DataFrame) -> Option<Vec<&str>> {
 }
 
 /// Concatenates arrays per column for dataframe
+/// # Examples
+/// ```
+/// # use datafusion_example::utils::dataframe::concat_arrays;
+/// # use datafusion::arrow::array::{Int32Array, StringArray};
+/// # use color_eyre::Result;
+/// use datafusion::prelude::*;
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
+/// let df = dataframe!(
+///     "id" => [1, 2, 3],
+///     "name" => ["foo", "bar", "baz"]
+/// )?;
+/// let arrays = concat_arrays(df).await?;
+/// assert_eq!(arrays.len(), 2);
+///
+/// let id_array = arrays[0]
+///     .as_any()
+///     .downcast_ref::<Int32Array>()
+///     .unwrap();
+/// assert_eq!(id_array.values(), &[1, 2, 3]);
+///
+/// let name_array = arrays[1]
+///     .as_any()
+///     .downcast_ref::<StringArray>()
+///     .unwrap();
+/// let values: Vec<String> = name_array
+///     .iter()
+///     .map(|v| v.unwrap_or_default().to_string())
+///     .collect();
+/// assert_eq!(values, ["foo", "bar", "baz"]);
+/// # Ok(())
+/// # }
+/// ```
 pub async fn concat_arrays(df: DataFrame) -> Result<Vec<ArrayRef>, UtilsError> {
     let schema = df.schema().clone();
     let batches = df.collect().await?;
@@ -114,6 +181,23 @@ pub async fn concat_arrays(df: DataFrame) -> Result<Vec<ArrayRef>, UtilsError> {
 }
 
 /// Concatenates batches together into a single RecordBatch
+/// # Examples
+/// ```
+/// # use datafusion_example::utils::dataframe::concat_df_batches;
+/// # use color_eyre::Result;
+/// use datafusion::prelude::*;
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
+/// let df = dataframe!(
+///     "id" => [1, 2, 3],
+///     "name" => ["foo", "bar", "baz"]
+/// )?;
+/// let batch = concat_df_batches(df).await?;
+/// assert_eq!(batch.num_columns(), 2);
+/// assert_eq!(batch.num_rows(), 3);
+/// # Ok(())
+/// # }
+/// ```
 pub async fn concat_df_batches(df: DataFrame) -> Result<RecordBatch, UtilsError> {
     let schema = df.schema().as_arrow().clone();
     let batches = df.collect().await?;
@@ -122,6 +206,36 @@ pub async fn concat_df_batches(df: DataFrame) -> Result<RecordBatch, UtilsError>
 }
 
 /// Concat dataframes with the same schema into one dataframe
+/// # Examples
+/// ```
+/// # use datafusion_example::utils::dataframe::concat_dfs;
+/// # use color_eyre::Result;
+/// use datafusion::prelude::*;
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
+/// let df1 = dataframe!(
+///     "id" => [1, 2, 3],
+///     "name" => ["foo", "bar", "baz"]
+/// )?;
+/// let df2 = dataframe!(
+///     "id" => [1, 2, 3],
+///     "name" => ["foo", "bar", "baz"]
+/// )?;
+/// let ctx = SessionContext::new();
+/// let res = concat_dfs(&ctx, vec![df1, df2]).await?;
+/// // +----+------+
+/// // | id | name |
+/// // +----+------+
+/// // | 1  | foo  |
+/// // | 2  | bar  |
+/// // | 3  | baz  |
+/// // | 1  | foo  |
+/// // | 2  | bar  |
+/// // | 3  | baz  |
+/// // +----+------+
+/// # Ok(())
+/// # }
+/// ```
 pub async fn concat_dfs(
     ctx: &SessionContext,
     dfs: Vec<DataFrame>,
@@ -441,6 +555,7 @@ pub async fn add_columns_to_df(
 }
 
 /// Read parquet file to dataframe
+/// (better use [`read_parquet`](https://docs.rs/datafusion/latest/datafusion/execution/context/struct.SessionContext.html#method.read_parquet))
 pub async fn read_file_to_df(
     ctx: &SessionContext,
     file_path: &str,
@@ -464,6 +579,7 @@ pub async fn read_file_to_df(
 }
 
 /// Write dataframe to parquet file
+/// (better use [`write_parquet`](https://docs.rs/datafusion/latest/datafusion/dataframe/struct.DataFrame.html#method.write_parquet))
 pub async fn write_df_to_file(df: DataFrame, file_path: &str) -> Result<(), UtilsError> {
     let mut buf = vec![];
     let schema = Schema::from(df.clone().schema());
