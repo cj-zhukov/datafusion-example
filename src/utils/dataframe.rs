@@ -24,12 +24,15 @@ use crate::error::UtilsError;
 /// Query dataframe with sql
 /// # Examples
 /// ```
+/// # use color_eyre::Result;
 /// # use datafusion_example::utils::dataframe::df_sql;
 /// use datafusion::prelude::*;
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
 /// let df = dataframe!(
 ///     "id" => [1, 2, 3],
 ///     "name" => ["foo", "bar", "baz"]
-/// ).unwrap();
+/// )?;
 /// // +----+------+,
 /// // | id | name |,
 /// // +----+------+,
@@ -38,12 +41,14 @@ use crate::error::UtilsError;
 /// // | 3  | baz  |,
 /// // +----+------+,
 /// let sql = r#"id > 2 and name in ('foo', 'bar', 'baz')"#;
-/// let res = df_sql(df, sql);
+/// let res = df_sql(df, sql)?;
 /// // +----+------+,
 /// // | id | name |,
 /// // +----+------+,
 /// // | 3  | baz  |,
 /// // +----+------+,
+/// # Ok(())
+/// # }
 /// ```
 pub async fn df_sql(df: DataFrame, sql: &str) -> Result<DataFrame, UtilsError> {
     let filter = df.parse_sql_expr(sql)?;
@@ -364,7 +369,7 @@ pub async fn df_cols_to_json(
 /// // | 3  | baz  | 44   |
 /// // +----+------+------+
 /// let ctx = SessionContext::new();
-/// let res = df_cols_to_struct(&ctx, df, &["name", "data"], "new_col").await;
+/// let res = df_cols_to_struct(&ctx, df, &["name", "data"], "new_col").await?;
 /// // +----+-----------------------+
 /// // | id | new_col               |
 /// // +----+-----------------------+

@@ -71,6 +71,7 @@ pub fn get_random_df(
 ) -> Result<DataFrame, UtilsError> {
     let cols = types.len();
     if cols == 0 && rows == 0 {
+        println!("returning empty dataframe");
         return get_empty_df(ctx);
     }
 
@@ -181,6 +182,27 @@ pub async fn add_pk_to_df(
 }
 
 /// Add int32 column to existing dataframe
+/// # Examples
+/// ```
+/// use datafusion::prelude::*;
+/// # use color_eyre::Result;
+/// # use datafusion_example::utils::helpers::add_int_col_to_df;
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
+/// let df = dataframe!("id" => [1, 2, 3])?;
+/// let ctx = SessionContext::new();
+/// let data = vec![0, 1, 2];
+/// let res = add_int_col_to_df(&ctx, df, data, "pk").await?;
+/// // +----+----+
+/// // | id | pk |
+/// // +----+----+
+/// // | 1  | 0  |
+/// // | 2  | 1  |
+/// // | 3  | 2  |
+/// // +----+----+
+/// # Ok(())
+/// # }
+/// ```
 pub async fn add_int_col_to_df(
     ctx: &SessionContext,
     df: DataFrame,
@@ -199,6 +221,27 @@ pub async fn add_int_col_to_df(
 }
 
 /// Add string column to existing dataframe
+/// # Examples
+/// ```
+/// use datafusion::prelude::*;
+/// # use color_eyre::Result;
+/// # use datafusion_example::utils::helpers::add_int_col_to_df;
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
+/// let df = dataframe!("id" => [1, 2, 3])?;
+/// let ctx = SessionContext::new();
+/// let data = vec!["foo", "bar", "baz"];
+/// let res = add_int_col_to_df(&ctx, df, data, "name").await?;
+/// // +----+------+
+/// // | id | name |
+/// // +----+------+
+/// // | 1  | foo  |
+/// // | 2  | bar  |
+/// // | 3  | baz  |
+/// // +----+------+
+/// # Ok(())
+/// # }
+/// ```
 pub async fn add_str_col_to_df(
     ctx: &SessionContext,
     df: DataFrame,
@@ -217,6 +260,29 @@ pub async fn add_str_col_to_df(
 }
 
 /// Add any numeric column to existing dataframe
+/// # Examples
+/// ```
+/// use datafusion::prelude::*;
+/// # use datafusion::arrow::array::PrimitiveArray;
+/// # use datafusion::arrow::datatypes::Int32Type;
+/// # use color_eyre::Result;
+/// # use datafusion_example::utils::helpers::add_any_num_col_to_df;
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
+/// let df = dataframe!("id" => [1, 2, 3])?;
+/// let ctx = SessionContext::new();
+/// let data: PrimitiveArray<Int32Type> = vec![0, 1, 2].into();
+/// let res = add_any_num_col_to_df(&ctx, df, data, "pk").await?;
+/// // +----+----+
+/// // | id | pk |
+/// // +----+----+
+/// // | 1  | 0  |
+/// // | 2  | 1  |
+/// // | 3  | 2  |
+/// // +----+----+
+/// # Ok(())
+/// # }
+/// ```
 pub async fn add_any_num_col_to_df<T>(
     ctx: &SessionContext,
     df: DataFrame,
@@ -238,6 +304,29 @@ where
 }
 
 /// Add any string column to existing dataframe
+/// # Examples
+/// ```
+/// use datafusion::prelude::*;
+/// # use datafusion::arrow::array::GenericByteArray;
+/// # use datafusion::arrow::datatypes::Utf8Type;
+/// # use color_eyre::Result;
+/// # use datafusion_example::utils::helpers::add_any_str_col_to_df;
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
+/// let df = dataframe!("id" => [1, 2, 3])?;
+/// let ctx = SessionContext::new();
+/// let data: GenericByteArray<Utf8Type> = vec!["foo", "bar", "baz"].into();
+/// let res = add_any_str_col_to_df(&ctx, df, data, "name").await?;
+/// // +----+------+
+/// // | id | name |
+/// // +----+------+
+/// // | 1  | foo  |
+/// // | 2  | bar  |
+/// // | 3  | baz  |
+/// // +----+------+
+/// # Ok(())
+/// # }
+/// ```
 pub async fn add_any_str_col_to_df<T>(
     ctx: &SessionContext,
     df: DataFrame,
@@ -335,12 +424,15 @@ pub async fn add_col_arr_to_df(
 /// # Examples
 /// ```
 /// use datafusion::prelude::*;
+/// # use color_eyre::Result;
 /// # use datafusion_example::utils::helpers::select_all_exclude;
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
 /// let df = dataframe!(
 ///     "id" => [1, 2, 3],
 ///     "name" => ["foo", "bar", "baz"],
 ///     "data" => [42, 43, 44]
-/// ).unwrap();
+/// )?;
 /// // +----+------+------+
 /// // | id | name | data |
 /// // +----+------+------+
@@ -349,7 +441,7 @@ pub async fn add_col_arr_to_df(
 /// // | 3  | baz  | 44   |
 /// // +----+------+------+
 /// let ctx = SessionContext::new();
-/// let res = select_all_exclude(df, &["name", "data"]);
+/// let res = select_all_exclude(df, &["name", "data"])?;
 /// // +----+
 /// // | id |
 /// // +----+
@@ -357,6 +449,8 @@ pub async fn add_col_arr_to_df(
 /// // | 2  |
 /// // | 3  |
 /// // +----+
+/// # Ok(())
+/// # }
 /// ```
 pub fn select_all_exclude(df: DataFrame, to_exclude: &[&str]) -> Result<DataFrame, UtilsError> {
     let schema = df.schema().clone();
