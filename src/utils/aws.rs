@@ -187,8 +187,7 @@ pub async fn read_from_s3(
 
     let path = format!("s3://{bucket}");
     let s3_url = Url::parse(&path)?;
-    ctx.runtime_env()
-        .register_object_store(&s3_url, Arc::new(s3));
+    ctx.register_object_store(&s3_url, Arc::new(s3));
 
     let path = format!("s3://{bucket}/{key}");
     ctx.register_parquet("t", &path, ParquetReadOptions::default())
