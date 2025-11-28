@@ -12,7 +12,6 @@ use awscreds::Credentials;
 use bytes::Bytes;
 use color_eyre::eyre::Report;
 use datafusion::arrow::array::RecordBatch;
-use datafusion::arrow::datatypes::Schema;
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::prelude::*;
 use futures_util::TryStreamExt;
@@ -244,7 +243,7 @@ pub async fn write_df_to_s3(
     df: DataFrame,
 ) -> Result<(), UtilsError> {
     let mut buf = vec![];
-    let schema = Schema::from(df.clone().schema());
+    let schema = df.schema().as_arrow().clone();
     let mut stream = df.execute_stream().await?;
     let mut writer = AsyncArrowWriter::try_new(&mut buf, schema.into(), None)?;
     while let Some(batch) = stream.next().await.transpose()? {
@@ -314,7 +313,7 @@ pub async fn write_big_df_to_s3(
     max_workers: usize,
 ) -> Result<(), UtilsError> {
     let mut buf = vec![];
-    let schema = Schema::from(df.clone().schema());
+    let schema = df.schema().as_arrow().clone();
     let mut stream = df.execute_stream().await?;
     let mut writer = AsyncArrowWriter::try_new(&mut buf, schema.into(), None)?;
     while let Some(batch) = stream.next().await.transpose()? {

@@ -50,7 +50,7 @@ use crate::error::UtilsError;
 /// # Ok(())
 /// # }
 /// ```
-pub async fn df_sql(df: DataFrame, sql: &str) -> Result<DataFrame, UtilsError> {
+pub fn df_sql(df: DataFrame, sql: &str) -> Result<DataFrame, UtilsError> {
     let filter = df.parse_sql_expr(sql)?;
     let res = df.filter(filter)?;
     Ok(res)
@@ -587,7 +587,7 @@ pub async fn read_file_to_df(
 /// (better use [`write_parquet`](https://docs.rs/datafusion/latest/datafusion/dataframe/struct.DataFrame.html#method.write_parquet))
 pub async fn write_df_to_file(df: DataFrame, file_path: &str) -> Result<(), UtilsError> {
     let mut buf = vec![];
-    let schema = Schema::from(df.clone().schema());
+    let schema = df.schema().as_arrow().clone();
     let mut stream = df.execute_stream().await?;
     let mut writer = AsyncArrowWriter::try_new(&mut buf, Arc::new(schema), None)?;
     while let Some(batch) = stream.next().await.transpose()? {

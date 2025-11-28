@@ -225,13 +225,13 @@ pub async fn add_int_col_to_df(
 /// ```
 /// use datafusion::prelude::*;
 /// # use color_eyre::Result;
-/// # use datafusion_example::utils::helpers::add_int_col_to_df;
+/// # use datafusion_example::utils::helpers::add_str_col_to_df;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 /// let df = dataframe!("id" => [1, 2, 3])?;
 /// let ctx = SessionContext::new();
 /// let data = vec!["foo", "bar", "baz"];
-/// let res = add_int_col_to_df(&ctx, df, data, "name").await?;
+/// let res = add_str_col_to_df(&ctx, df, data, "name").await?;
 /// // +----+------+
 /// // | id | name |
 /// // +----+------+

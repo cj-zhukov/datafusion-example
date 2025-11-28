@@ -287,7 +287,7 @@ async fn test_df_sql() -> Result<()> {
         "data" => [42, 43, 44]
     )?;
     let sql = r#"id > 2 and data > 43 and name in ('foo', 'bar', 'baz')"#;
-    let res = df_sql(df, sql).await?;
+    let res = df_sql(df, sql)?;
 
     assert_eq!(res.schema().fields().len(), 3);
     assert_eq!(res.clone().count().await?, 1);
