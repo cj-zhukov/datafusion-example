@@ -39,7 +39,7 @@ impl Foo {
     }
 
     fn to_record_batch(records: &[Self]) -> Result<RecordBatch> {
-        let schema = Foo::schema();
+        let schema = Self::schema();
         let ids = records.iter().map(|r| r.id).collect::<Vec<_>>();
         let names = records
             .iter()

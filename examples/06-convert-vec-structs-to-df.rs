@@ -23,7 +23,7 @@ impl Foo {
 }
 
 impl Foo {
-    async fn to_df(ctx: &SessionContext, records: &Vec<Self>) -> Result<DataFrame> {
+    async fn to_df(ctx: &SessionContext, records: &[Self]) -> Result<DataFrame> {
         let mut ids = vec![];
         let mut names = vec![];
 
