@@ -15,9 +15,9 @@ use tempfile::tempdir;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // round_robin_example().await?;
-    // random_example().await?;
-    // least_values_example().await?;
+    round_robin_example().await?;
+    random_example().await?;
+    least_values_example().await?;
     one_billion_row_challenge().await?;
     Ok(())
 }
