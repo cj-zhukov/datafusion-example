@@ -6,9 +6,9 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::error::DataFusionError;
 use datafusion::prelude::*;
 
-pub struct FooBatch<'a>(pub &'a [Foo]);
+struct FooBatch<'a>(pub &'a [Foo]);
 
-pub struct Foo {
+struct Foo {
     pub id: Option<i32>,
     pub name: Option<String>,
 }
@@ -65,15 +65,14 @@ impl<'a> TryFrom<FooBatch<'a>> for RecordBatch {
 }
 
 impl Foo {
-    pub async fn to_df(ctx: &SessionContext, records: &[Self]) -> Result<DataFrame> {
+    async fn to_df(ctx: &SessionContext, records: &[Self]) -> Result<DataFrame> {
         let batch = RecordBatch::try_from(FooBatch(records))?;
         let df = ctx.read_batch(batch)?;
         Ok(df)
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+pub async fn convert_vec_structs_to_df_v3_example() -> Result<()> {
     let records = get_foos();
     let ctx = SessionContext::new();
     let df = Foo::to_df(&ctx, &records).await?;

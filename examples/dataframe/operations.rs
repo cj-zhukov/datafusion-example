@@ -12,8 +12,7 @@ use datafusion_example::utils::dataframe::df_to_table;
 use datafusion_example::utils::scalarvalue::parse_strings;
 use tokio_stream::StreamExt;
 
-#[tokio::main]
-async fn main() -> Result<()> {
+pub async fn operations_example() -> Result<()> {
     join().await?;
     join_sql().await?;
     add_literal_col().await?;
@@ -29,7 +28,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-pub async fn join() -> Result<()> {
+async fn join() -> Result<()> {
     let schema = Arc::new(Schema::new(vec![
         Field::new("id", DataType::Utf8, false),
         Field::new("name", DataType::Int32, false),
@@ -70,7 +69,7 @@ pub async fn join() -> Result<()> {
     Ok(())
 }
 
-pub async fn join_sql() -> Result<()> {
+async fn join_sql() -> Result<()> {
     let schema = Arc::new(Schema::new(vec![
         Field::new("id", DataType::Utf8, false),
         Field::new("name", DataType::Int32, false),
@@ -111,7 +110,7 @@ pub async fn join_sql() -> Result<()> {
     Ok(())
 }
 
-pub async fn add_literal_col() -> Result<()> {
+async fn add_literal_col() -> Result<()> {
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
         Field::new("data", DataType::Int32, true),
@@ -136,7 +135,7 @@ pub async fn add_literal_col() -> Result<()> {
     Ok(())
 }
 
-pub async fn add_str_col() -> Result<()> {
+async fn add_str_col() -> Result<()> {
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
         Field::new("data", DataType::Int32, true),
@@ -179,7 +178,7 @@ pub async fn add_str_col() -> Result<()> {
     Ok(())
 }
 
-pub async fn df_cols_to_struct() -> Result<()> {
+async fn df_cols_to_struct() -> Result<()> {
     let schema = Arc::new(Schema::new(vec![
         Field::new("id", DataType::Int32, false),
         Field::new("name", DataType::Utf8, false),
@@ -207,7 +206,7 @@ pub async fn df_cols_to_struct() -> Result<()> {
     Ok(())
 }
 
-pub async fn update_col_df1() -> Result<()> {
+async fn update_col_df1() -> Result<()> {
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
         Field::new("data", DataType::Int32, true),
@@ -236,7 +235,7 @@ pub async fn update_col_df1() -> Result<()> {
     Ok(())
 }
 
-pub async fn update_col_df2() -> Result<()> {
+async fn update_col_df2() -> Result<()> {
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
         Field::new("data", DataType::Int32, true),
@@ -269,7 +268,7 @@ pub async fn update_col_df2() -> Result<()> {
     Ok(())
 }
 
-pub async fn assert1() -> Result<()> {
+async fn assert1() -> Result<()> {
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
         Field::new("data", DataType::Int32, true),
@@ -304,7 +303,7 @@ pub async fn assert1() -> Result<()> {
     Ok(())
 }
 
-pub async fn assert2() -> Result<()> {
+async fn assert2() -> Result<()> {
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
         Field::new("data", DataType::Int32, true),
@@ -380,7 +379,7 @@ pub async fn assert2() -> Result<()> {
     Ok(())
 }
 
-pub async fn downcast_df() -> Result<()> {
+async fn downcast_df() -> Result<()> {
     let ctx = SessionContext::new();
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
@@ -425,7 +424,7 @@ pub async fn downcast_df() -> Result<()> {
     Ok(())
 }
 
-pub fn downcast_df2() -> Result<()> {
+fn downcast_df2() -> Result<()> {
     let array = parse_strings(["1", "2", "3"], DataType::Int32)?;
     let integers = array.as_any().downcast_ref::<Int32Array>().unwrap();
     let vals = integers.values();

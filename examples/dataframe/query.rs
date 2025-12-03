@@ -6,8 +6,7 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::datasource::MemTable;
 use datafusion::prelude::*;
 
-#[tokio::main]
-async fn main() -> Result<()> {
+pub async fn query_example() -> Result<()> {
     query1().await?;
     query2().await?;
     query3().await?;
@@ -17,7 +16,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-pub async fn query1() -> Result<()> {
+async fn query1() -> Result<()> {
     let schema = Arc::new(Schema::new(vec![
         Field::new("id", DataType::Int32, false),
         Field::new("name", DataType::Utf8, false),
@@ -47,7 +46,7 @@ pub async fn query1() -> Result<()> {
     Ok(())
 }
 
-pub async fn query2() -> Result<()> {
+async fn query2() -> Result<()> {
     let schema = Arc::new(Schema::new(vec![
         Field::new("id", DataType::Int32, false),
         Field::new("name", DataType::Utf8, false),
@@ -75,7 +74,7 @@ pub async fn query2() -> Result<()> {
     Ok(())
 }
 
-pub async fn query3() -> Result<()> {
+async fn query3() -> Result<()> {
     let schema = Arc::new(Schema::new(vec![
         Field::new("id", DataType::Int32, false),
         Field::new("name", DataType::Utf8, false),
@@ -108,7 +107,7 @@ pub async fn query3() -> Result<()> {
     Ok(())
 }
 
-pub async fn query4() -> Result<()> {
+async fn query4() -> Result<()> {
     let ctx = SessionContext::new();
     ctx.register_parquet(
         "t",
@@ -121,7 +120,7 @@ pub async fn query4() -> Result<()> {
     Ok(())
 }
 
-pub async fn view_example() -> Result<()> {
+async fn view_example() -> Result<()> {
     let schema = Arc::new(Schema::new(vec![
         Field::new("id", DataType::Int32, false),
         Field::new("name", DataType::Utf8, false),
@@ -146,7 +145,7 @@ pub async fn view_example() -> Result<()> {
     Ok(())
 }
 
-pub async fn cte_example() -> Result<()> {
+async fn cte_example() -> Result<()> {
     let schema = Arc::new(Schema::new(vec![
         Field::new("id", DataType::Int32, false),
         Field::new("name", DataType::Utf8, false),

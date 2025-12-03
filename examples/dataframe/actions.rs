@@ -10,8 +10,7 @@ use itertools::Itertools;
 use serde_json::{Map, Value};
 use tokio_stream::StreamExt;
 
-#[tokio::main]
-async fn main() -> Result<()> {
+pub async fn actions_example() -> Result<()> {
     demo_struct().await?;
     record_batches_to_json_rows()?;
     df_cols_to_json_example().await?;
@@ -20,7 +19,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-pub async fn demo_struct() -> Result<()> {
+async fn demo_struct() -> Result<()> {
     let ctx = SessionContext::new();
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
@@ -110,7 +109,7 @@ pub async fn demo_struct() -> Result<()> {
     Ok(())
 }
 
-pub fn record_batches_to_json_rows() -> Result<()> {
+fn record_batches_to_json_rows() -> Result<()> {
     let schema = Schema::new(vec![Field::new("a", DataType::Int32, false)]);
     let a = Int32Array::from(vec![1, 2, 3]);
     let batch = RecordBatch::try_new(Arc::new(schema), vec![Arc::new(a)]).unwrap();
@@ -133,7 +132,7 @@ pub fn record_batches_to_json_rows() -> Result<()> {
     Ok(())
 }
 
-pub async fn df_cols_to_json_example() -> Result<()> {
+async fn df_cols_to_json_example() -> Result<()> {
     let ctx = SessionContext::new();
     let schema1 = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
@@ -220,7 +219,7 @@ pub async fn df_cols_to_json_example() -> Result<()> {
     Ok(())
 }
 
-pub async fn df_cols_to_struct_example() -> Result<()> {
+async fn df_cols_to_struct_example() -> Result<()> {
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
         Field::new("name", DataType::Utf8, true),
@@ -314,7 +313,7 @@ pub async fn df_cols_to_struct_example() -> Result<()> {
     Ok(())
 }
 
-pub async fn scalar_new_example() -> Result<()> {
+async fn scalar_new_example() -> Result<()> {
     let ctx = SessionContext::new();
     let schema1 = Schema::new(vec![
         Field::new("id", DataType::Int32, false),

@@ -3,128 +3,11 @@ use std::io::Write;
 use std::sync::Arc;
 
 use color_eyre::Result;
-use datafusion::arrow::array::{
-    ArrayRef, Float64Array, Float64Builder, Int32Array, RecordBatch, StringArray, StringBuilder,
-    StructArray,
-};
-use datafusion::arrow::datatypes::{DataType, Field, Fields, Schema};
+use datafusion::arrow::array::{ArrayRef, Float64Builder, StringArray, StringBuilder, StructArray};
+use datafusion::arrow::datatypes::{DataType, Field, Fields};
 use datafusion::logical_expr::{ColumnarValue, Volatility};
 use datafusion::prelude::*;
-use datafusion_example::utils::dataframe::df_to_table;
 use tempfile::tempdir;
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    round_robin_example().await?;
-    random_example().await?;
-    least_values_example().await?;
-    one_billion_row_challenge().await?;
-    Ok(())
-}
-
-/// Round-Robin Selection of Workers
-pub async fn round_robin_example() -> Result<()> {
-    let ctx = SessionContext::new();
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, true),
-        Field::new("data", DataType::Float64, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.clone().into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-            Arc::new(Float64Array::from(vec![1.0, 10.0, 100.0])),
-        ],
-    )?;
-    let df = ctx.read_batch(batch.clone())?;
-    let table_name = "t";
-    df_to_table(&ctx, df, table_name).await?;
-
-    let mut cur_worker = 1;
-    while cur_worker <= 5 {
-        let round_robin_sql =
-            format!("(({cur_worker} - 1) % (select count(*) from {table_name})) + 1");
-        let df = ctx
-            .sql(&format!(
-                "select * from {table_name} where id = {round_robin_sql}"
-            ))
-            .await?;
-        df.show().await?;
-        cur_worker += 1;
-    }
-
-    Ok(())
-}
-
-pub async fn random_example() -> Result<()> {
-    let ctx = SessionContext::new();
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, true),
-        Field::new("data", DataType::Float64, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.clone().into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-            Arc::new(Float64Array::from(vec![1.0, 10.0, 100.0])),
-        ],
-    )?;
-    let df = ctx.read_batch(batch.clone())?;
-    let table_name = "t";
-    df_to_table(&ctx, df, table_name).await?;
-
-    let sql = format!(
-        "select *
-                from {table_name} 
-                where 1 = 1 
-                order by random()
-                limit 1"
-    );
-
-    for _ in 0..5 {
-        let df = ctx.sql(&sql).await?;
-        df.show().await?;
-    }
-
-    Ok(())
-}
-
-pub async fn least_values_example() -> Result<()> {
-    let ctx = SessionContext::new();
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int32, false),
-        Field::new("name", DataType::Utf8, true),
-        Field::new("data", DataType::Float64, true),
-    ]);
-    let batch = RecordBatch::try_new(
-        schema.clone().into(),
-        vec![
-            Arc::new(Int32Array::from(vec![1, 2, 3])),
-            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
-            Arc::new(Float64Array::from(vec![1.0, 10.0, 100.0])),
-        ],
-    )?;
-    let df = ctx.read_batch(batch.clone())?;
-    let table_name = "t";
-    let col_val = "id";
-    df_to_table(&ctx, df, table_name).await?;
-
-    let sql = format!(
-        "select *
-                from {table_name} 
-                where 1 = 1 
-                and {col_val} = (select min({col_val}) from {table_name})"
-    );
-
-    let df = ctx.sql(&sql).await?;
-    df.show().await?;
-
-    Ok(())
-}
 
 pub async fn one_billion_row_challenge() -> Result<()> {
     let csv_data = r#"Tokyo;35.6897
@@ -236,7 +119,8 @@ Douala;4.0500"#;
     let file_path = file_path.to_str().unwrap();
     let ctx = SessionContext::new();
     let options = CsvReadOptions::new().has_header(false);
-    ctx.register_csv("weather_stations", file_path, options).await?;
+    ctx.register_csv("weather_stations", file_path, options)
+        .await?;
 
     let return_type = DataType::Struct(Fields::from(vec![
         Arc::new(Field::new("city", DataType::Utf8, true)),

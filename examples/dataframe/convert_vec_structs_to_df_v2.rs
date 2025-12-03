@@ -5,7 +5,7 @@ use datafusion::arrow::array::{Int32Array, RecordBatch, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::prelude::*;
 
-pub struct Foo {
+struct Foo {
     pub id: Option<i32>,
     pub name: Option<String>,
 }
@@ -57,15 +57,14 @@ impl Foo {
 }
 
 impl Foo {
-    pub async fn to_df(ctx: &SessionContext, records: &[Self]) -> Result<DataFrame> {
+    async fn to_df(ctx: &SessionContext, records: &[Self]) -> Result<DataFrame> {
         let batch = Self::to_record_batch(records)?;
         let df = ctx.read_batch(batch)?;
         Ok(df)
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+pub async fn convert_vec_structs_to_df_v2_example() -> Result<()> {
     let records = get_foos();
     let ctx = SessionContext::new();
     let df = Foo::to_df(&ctx, &records).await?;
