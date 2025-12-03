@@ -8,8 +8,7 @@ use datafusion::arrow::datatypes::{DataType, Field, Fields, Int32Type, Schema};
 use datafusion::prelude::*;
 use datafusion::scalar::ScalarValue;
 
-#[tokio::main]
-async fn main() -> Result<()> {
+pub async fn create_example() -> Result<()> {
     create_df1().await?;
     create_df2().await?;
     create_df3().await?;
@@ -22,7 +21,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-pub async fn create_df1() -> Result<()> {
+async fn create_df1() -> Result<()> {
     let ctx = SessionContext::new();
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
@@ -42,7 +41,7 @@ pub async fn create_df1() -> Result<()> {
     Ok(())
 }
 
-pub async fn create_df2() -> Result<()> {
+async fn create_df2() -> Result<()> {
     let ctx = SessionContext::new();
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
@@ -62,7 +61,7 @@ pub async fn create_df2() -> Result<()> {
     Ok(())
 }
 
-pub async fn create_df3() -> Result<()> {
+async fn create_df3() -> Result<()> {
     let ctx = SessionContext::new();
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
@@ -86,7 +85,7 @@ pub async fn create_df3() -> Result<()> {
     Ok(())
 }
 
-pub async fn create_df4() -> Result<()> {
+async fn create_df4() -> Result<()> {
     let ctx = SessionContext::new();
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
@@ -112,7 +111,7 @@ pub async fn create_df4() -> Result<()> {
     Ok(())
 }
 
-pub async fn create_df5() -> Result<()> {
+async fn create_df5() -> Result<()> {
     let ctx = SessionContext::new();
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
@@ -136,7 +135,7 @@ pub async fn create_df5() -> Result<()> {
     Ok(())
 }
 
-pub async fn create_df_struct1() -> Result<()> {
+async fn create_df_struct1() -> Result<()> {
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
         Field::new(
@@ -180,7 +179,7 @@ pub async fn create_df_struct1() -> Result<()> {
     Ok(())
 }
 
-pub async fn create_df_struct2() -> Result<()> {
+async fn create_df_struct2() -> Result<()> {
     let ctx = SessionContext::new();
 
     let schema = Schema::new(vec![Field::new("id", DataType::Int32, false)]);
@@ -218,7 +217,7 @@ pub async fn create_df_struct2() -> Result<()> {
     Ok(())
 }
 
-pub async fn create_df_list_arr() -> Result<()> {
+async fn create_df_list_arr() -> Result<()> {
     let schema = Schema::new(vec![
         Field::new("id", DataType::Int32, false),
         Field::new("name", DataType::Utf8, true),
@@ -255,7 +254,7 @@ pub async fn create_df_list_arr() -> Result<()> {
     Ok(())
 }
 
-pub async fn create_df_with_macro() -> Result<()> {
+async fn create_df_with_macro() -> Result<()> {
     let df = dataframe!(
         "id" => [1, 2, 3],
         "name" => ["foo", "bar", "baz"]

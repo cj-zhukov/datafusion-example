@@ -7,15 +7,14 @@ use datafusion::logical_expr::{ColumnarValue, Volatility};
 use datafusion::prelude::*;
 use datafusion_example::utils::dataframe::df_plan_to_table;
 
-#[tokio::main]
-async fn main() -> Result<()> {
+pub async fn udf_example() -> Result<()> {
     split_name().await?;
     split_name_sql().await?;
     Ok(())
 }
 
 // split foo.txt by . and get name
-pub async fn split_name() -> Result<()> {
+async fn split_name() -> Result<()> {
     let split_text = Arc::new(|args: &[ColumnarValue]| {
         let input = match &args[0] {
             ColumnarValue::Array(array) => array
@@ -60,7 +59,7 @@ pub async fn split_name() -> Result<()> {
 }
 
 // split foo.txt by . and get extension
-pub async fn split_name_sql() -> Result<()> {
+async fn split_name_sql() -> Result<()> {
     let split_text = Arc::new(|args: &[ColumnarValue]| {
         let input = match &args[0] {
             ColumnarValue::Array(array) => array

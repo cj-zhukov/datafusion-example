@@ -8,14 +8,15 @@ use itertools::izip;
 use tokio_stream::StreamExt;
 
 #[derive(Debug)]
-pub struct Foo {
-    pub id: Option<i32>,
-    pub name: Option<String>,
-    pub data_val: Option<Vec<u8>>,
+#[allow(dead_code)]
+struct Foo {
+    id: Option<i32>,
+    name: Option<String>,
+    data_val: Option<Vec<u8>>,
 }
 
 impl Foo {
-    pub fn schema() -> Schema {
+    fn schema() -> Schema {
         Schema::new(vec![
             Field::new("id", DataType::Int32, true),
             Field::new("name", DataType::Utf8, true),
@@ -23,7 +24,7 @@ impl Foo {
         ])
     }
 
-    pub fn data() -> Vec<Arc<dyn Array>> {
+    fn data() -> Vec<Arc<dyn Array>> {
         vec![
             Arc::new(Int32Array::from(vec![1, 2, 3])),
             Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
@@ -31,7 +32,7 @@ impl Foo {
         ]
     }
 
-    pub fn data_with_null() -> Vec<Arc<dyn Array>> {
+    fn data_with_null() -> Vec<Arc<dyn Array>> {
         vec![
             Arc::new(Int32Array::from(vec![Some(1), Some(2), None])),
             Arc::new(StringArray::from(vec![Some("foo"), None, None])),
@@ -41,7 +42,7 @@ impl Foo {
 }
 
 impl Foo {
-    pub async fn example1(ctx: &SessionContext) -> Result<()> {
+    async fn example1(ctx: &SessionContext) -> Result<()> {
         let schema = Self::schema();
         let data = Self::data();
         let batch = RecordBatch::try_new(Arc::new(schema), data)?;
@@ -66,7 +67,7 @@ impl Foo {
         Ok(())
     }
 
-    pub async fn example2(ctx: &SessionContext) -> Result<()> {
+    async fn example2(ctx: &SessionContext) -> Result<()> {
         let schema = Self::schema();
         let data = Self::data();
         let batch = RecordBatch::try_new(Arc::new(schema), data)?;
@@ -121,7 +122,7 @@ impl Foo {
     }
 
     /// shows how to deserialize dataframe to struct, if some columns don't exist in dataframe
-    pub async fn example3(ctx: &SessionContext) -> Result<()> {
+    async fn example3(ctx: &SessionContext) -> Result<()> {
         let schema = Self::schema();
         let data = Self::data_with_null();
         let batch = RecordBatch::try_new(Arc::new(schema), data)?;
@@ -200,8 +201,7 @@ impl Foo {
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+pub async fn deserialize_to_struct_examle() -> Result<()> {
     let ctx = SessionContext::new();
     Foo::example1(&ctx).await?;
     Foo::example2(&ctx).await?;

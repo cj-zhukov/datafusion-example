@@ -8,13 +8,13 @@ use datafusion::prelude::*;
 use serde::Serialize;
 
 #[derive(Serialize)]
-pub struct Foo {
+struct Foo {
     pub id: i32,
     pub name: String,
 }
 
 impl Foo {
-    pub fn schema() -> Schema {
+    fn schema() -> Schema {
         Schema::new(vec![
             Field::new("id", DataType::Int32, false),
             Field::new("name", DataType::Utf8, true),
@@ -65,16 +65,6 @@ fn get_foos() -> Vec<Foo> {
     records
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    let records = get_foos();
-    let ctx = SessionContext::new();
-
-    convert_vec_structs_to_df1(&ctx, &records).await?;
-    convert_vec_structs_to_df2(&ctx, &records).await?;
-    Ok(())
-}
-
 async fn convert_vec_structs_to_df1(ctx: &SessionContext, records: &Vec<Foo>) -> Result<()> {
     let schema = Foo::schema();
     let mut decoder = ReaderBuilder::new(Arc::new(schema)).build_decoder()?;
@@ -88,5 +78,13 @@ async fn convert_vec_structs_to_df1(ctx: &SessionContext, records: &Vec<Foo>) ->
 async fn convert_vec_structs_to_df2(ctx: &SessionContext, records: &Vec<Foo>) -> Result<()> {
     let df = Foo::to_df(ctx, records).await?;
     df.show().await?;
+    Ok(())
+}
+
+pub async fn convert_vec_structs_to_df_example() -> Result<()> {
+    let records = get_foos();
+    let ctx = SessionContext::new();
+    convert_vec_structs_to_df1(&ctx, &records).await?;
+    convert_vec_structs_to_df2(&ctx, &records).await?;
     Ok(())
 }

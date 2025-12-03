@@ -1,16 +1,26 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+cd examples/
+SKIP_LIST=()
 
-EXAMPLES_DIR="examples"
+skip_example() {
+    local name="$1"
+    for skip in "${SKIP_LIST[@]}"; do
+        if [ "$name" = "$skip" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
 
-for file in "$EXAMPLES_DIR"/*.rs; do
-    example_name=$(basename "$file" .rs)
+for dir in */; do
+    example_name=$(basename "$dir")
 
-    echo "Running example: $example_name"
-    echo "----------------------------------------"
+    if skip_example "$example_name"; then
+        echo "Skipping $example_name"
+        continue
+    fi
 
-    cargo run --example "$example_name"
-
-    echo
+    echo "Running example group: $example_name"
+    cargo run --example "$example_name" -- all
 done
