@@ -27,10 +27,12 @@ mod deserialize_to_struct;
 mod operations;
 mod query;
 
-use std::str::FromStr;
-
 use color_eyre::{Report, Result};
+use strum::{IntoEnumIterator, VariantNames};
+use strum_macros::{Display, EnumIter, EnumString, VariantNames};
 
+#[derive(EnumIter, EnumString, Display, VariantNames)]
+#[strum(serialize_all = "snake_case")]
 enum ExampleKind {
     All,
     Actions,
@@ -43,79 +45,18 @@ enum ExampleKind {
     Query,
 }
 
-impl AsRef<str> for ExampleKind {
-    fn as_ref(&self) -> &str {
-        match self {
-            Self::All => "all",
-            Self::Actions => "actions",
-            Self::ConvertVecStructsToDf => "convert_vec_structs_to_df",
-            Self::ConvertVecStructsToDfV2 => "convert_vec_structs_to_df_v2",
-            Self::ConvertVecStructsToDfV3 => "convert_vec_structs_to_df_v3",
-            Self::Create => "create",
-            Self::DeserializeToStruct => "deserialize_to_struct",
-            Self::Operations => "operations",
-            Self::Query => "query",
-        }
-    }
-}
-
-impl FromStr for ExampleKind {
-    type Err = color_eyre::eyre::Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s {
-            "all" => Ok(Self::All),
-            "actions" => Ok(Self::Actions),
-            "convert_vec_structs_to_df" => Ok(Self::ConvertVecStructsToDf),
-            "convert_vec_structs_to_df_v2" => Ok(Self::ConvertVecStructsToDfV2),
-            "convert_vec_structs_to_df_v3" => Ok(Self::ConvertVecStructsToDfV3),
-            "create" => Ok(Self::Create),
-            "deserialize_to_struct" => Ok(Self::DeserializeToStruct),
-            "operations" => Ok(Self::Operations),
-            "query" => Ok(Self::Query),
-            _ => Err(Report::msg(format!("Unknown example: {s}"))),
-        }
-    }
-}
-
 impl ExampleKind {
-    const ALL_VARIANTS: [Self; 9] = [
-        Self::All,
-        Self::Actions,
-        Self::ConvertVecStructsToDf,
-        Self::ConvertVecStructsToDfV2,
-        Self::ConvertVecStructsToDfV3,
-        Self::Create,
-        Self::DeserializeToStruct,
-        Self::Operations,
-        Self::Query,
-    ];
-
-    const RUNNABLE_VARIANTS: [Self; 8] = [
-        Self::Actions,
-        Self::ConvertVecStructsToDf,
-        Self::ConvertVecStructsToDfV2,
-        Self::ConvertVecStructsToDfV3,
-        Self::Create,
-        Self::DeserializeToStruct,
-        Self::Operations,
-        Self::Query,
-    ];
-
     const EXAMPLE_NAME: &str = "dataframe";
 
-    fn variants() -> Vec<&'static str> {
-        Self::ALL_VARIANTS
-            .iter()
-            .map(|example| example.as_ref())
-            .collect()
+    fn runnable() -> impl Iterator<Item = ExampleKind> {
+        ExampleKind::iter().filter(|v| !matches!(v, ExampleKind::All))
     }
 
     async fn run(&self) -> Result<()> {
         match self {
             ExampleKind::All => {
-                for example in ExampleKind::RUNNABLE_VARIANTS {
-                    println!("Running example: {}", example.as_ref());
+                for example in ExampleKind::runnable() {
+                    println!("Running example: {example}");
                     Box::pin(example.run()).await?;
                 }
             }
@@ -145,14 +86,14 @@ async fn main() -> Result<()> {
     let usage = format!(
         "Usage: cargo run --example {} -- [{}]",
         ExampleKind::EXAMPLE_NAME,
-        ExampleKind::variants().join("|")
+        ExampleKind::VARIANTS.join("|")
     );
 
-    let arg = std::env::args().nth(1).ok_or_else(|| {
-        eprintln!("{usage}");
-        Report::msg("Missing argument".to_string())
-    })?;
+    let example: ExampleKind = std::env::args()
+        .nth(1)
+        .ok_or_else(|| Report::msg(format!("Missing argument. {usage}")))?
+        .parse()
+        .map_err(|_| Report::msg(format!("Unknown example. {usage}")))?;
 
-    let example = arg.parse::<ExampleKind>()?;
     example.run().await
 }
