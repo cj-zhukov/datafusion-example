@@ -5,9 +5,6 @@ DataFusion APIs code examples
 To run an example, use the `cargo run` command, such as:
 
 ```bash
-# Change to the examples directory
-cd examples
-
 # Run all examples in a group
 cargo run --example <group> -- all
 
@@ -19,7 +16,7 @@ cargo run --example dataframe -- all
 
 # Run a single example from the `dataframe` group
 # (apply the same pattern for any other group)
-cargo run --example dataframe -- dataframe
+cargo run --example dataframe -- deserialize_to_struct
 ```
 
 ### Group: algo
