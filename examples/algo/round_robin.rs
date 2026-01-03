@@ -4,7 +4,7 @@ use color_eyre::Result;
 use datafusion::arrow::array::{Float64Array, Int32Array, RecordBatch, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::prelude::*;
-use datafusion_example::utils::dataframe::df_to_table;
+use datafusion_example::utils::dataframe::register_df_view;
 
 /// Round-Robin Selection of Workers
 pub async fn round_robin_example() -> Result<()> {
@@ -24,7 +24,7 @@ pub async fn round_robin_example() -> Result<()> {
     )?;
     let df = ctx.read_batch(batch.clone())?;
     let table_name = "t";
-    df_to_table(&ctx, df, table_name).await?;
+    register_df_view(&ctx, &df, table_name)?;
 
     let mut cur_worker = 1;
     while cur_worker <= 5 {

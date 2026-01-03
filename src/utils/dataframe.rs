@@ -9,7 +9,6 @@ use datafusion::arrow::error::ArrowError;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::datasource::{MemTable, ViewTable};
 use datafusion::error::DataFusionError;
-use datafusion::logical_expr::LogicalPlan;
 use datafusion::prelude::*;
 use futures_util::TryStreamExt;
 use futures_util::future::try_join_all;
@@ -599,27 +598,78 @@ pub async fn write_df_to_file(df: DataFrame, file_path: &str) -> Result<(), Util
     Ok(())
 }
 
-/// Register dataframe as table to query later
-pub async fn df_to_table(
+/// Register a DataFrame as a *materialized* table (executes immediately)
+/// # Examples
+/// ```
+/// # use color_eyre::Result;
+/// use datafusion::prelude::*;
+/// # use datafusion_example::utils::dataframe::register_materialized_df;
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
+/// let df = dataframe!(
+///     "id" => [1, 2, 3],
+///     "name" => ["foo", "bar", "baz"],
+///     "data" => [42, 43, 44]
+/// )?;
+/// let ctx = SessionContext::new();
+/// register_materialized_df(&ctx, df, "foo").await?;
+/// let res = ctx.sql("select * from foo").await?;
+/// // +----+------+------+
+/// // | id | name | data |
+/// // +----+------+------+
+/// // | 1  | foo  | 42   |
+/// // | 2  | bar  | 43   |
+/// // | 3  | baz  | 44   |
+/// // +----+------+------+
+/// # Ok(())
+/// # }
+/// ```
+pub async fn register_materialized_df(
     ctx: &SessionContext,
     df: DataFrame,
-    table_name: &str,
+    name: &str,
 ) -> Result<(), UtilsError> {
     let schema = df.schema().as_arrow().clone();
     let batches = df.collect().await?;
     let mem_table = MemTable::try_new(Arc::new(schema), vec![batches])?;
-    ctx.register_table(table_name, Arc::new(mem_table))?;
+    ctx.register_table(name, Arc::new(mem_table))?;
     Ok(())
 }
 
-/// Register dataframe plan as table to query later
-pub fn df_plan_to_table(
+/// Register a DataFrame as a *lazy view* (no execution)
+/// # Examples
+/// ```
+/// # use color_eyre::Result;
+/// use datafusion::prelude::*;
+/// # use datafusion_example::utils::dataframe::register_df_view;
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
+/// let df = dataframe!(
+///     "id" => [1, 2, 3],
+///     "name" => ["foo", "bar", "baz"],
+///     "data" => [42, 43, 44]
+/// )?;
+/// let ctx = SessionContext::new();
+/// register_df_view(&ctx, &df, "foo")?;
+/// let res = ctx.sql("select * from foo").await?;
+/// // +----+------+------+
+/// // | id | name | data |
+/// // +----+------+------+
+/// // | 1  | foo  | 42   |
+/// // | 2  | bar  | 43   |
+/// // | 3  | baz  | 44   |
+/// // +----+------+------+
+/// # Ok(())
+/// # }
+/// ```
+pub fn register_df_view(
     ctx: &SessionContext,
-    plan: LogicalPlan,
-    table_name: &str,
+    df: &DataFrame,
+    name: &str,
 ) -> Result<(), UtilsError> {
+    let plan = df.logical_plan().clone();
     let view = ViewTable::new(plan, None);
-    ctx.register_table(table_name, Arc::new(view))?;
+    ctx.register_table(name, Arc::new(view))?;
     Ok(())
 }
 
@@ -1061,6 +1111,42 @@ mod tests {
         #[case] expected: Vec<ArrayRef>,
     ) -> Result<()> {
         let res = join_dfs(dfs, columns)?;
+        let batch = concat_df_batches(res).await?;
+        let arrays: Vec<ArrayRef> = batch.columns().to_vec();
+        assert_eq!(arrays, expected);
+        Ok(())
+    }
+    
+    #[tokio::test]
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef])]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
+    #[case(dataframe!("id" => [1, 2, 3])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef])]
+    async fn test_register_df_view(
+        #[case] df: DataFrame,
+        #[case] expected: Vec<ArrayRef>,
+    ) -> Result<()> {
+        let ctx = SessionContext::new();
+        register_df_view(&ctx, &df, "foo")?;
+        let res = ctx.sql("select * from foo").await?;
+        let batch = concat_df_batches(res).await?;
+        let arrays: Vec<ArrayRef> = batch.columns().to_vec();
+        assert_eq!(arrays, expected);
+        Ok(())
+    }
+    
+    #[tokio::test]
+    #[rstest]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef])]
+    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
+    #[case(dataframe!("id" => [1, 2, 3])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef])]
+    async fn test_register_materialized_df(
+        #[case] df: DataFrame,
+        #[case] expected: Vec<ArrayRef>,
+    ) -> Result<()> {
+        let ctx = SessionContext::new();
+        register_materialized_df(&ctx, df, "foo").await?;
+        let res = ctx.sql("select * from foo").await?;
         let batch = concat_df_batches(res).await?;
         let arrays: Vec<ArrayRef> = batch.columns().to_vec();
         assert_eq!(arrays, expected);

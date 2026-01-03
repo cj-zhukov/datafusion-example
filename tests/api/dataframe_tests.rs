@@ -339,14 +339,14 @@ async fn test_get_empty_df() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_df_to_table() -> Result<()> {
+async fn test_register_materialized_df() -> Result<()> {
     let ctx = SessionContext::new();
     let df = dataframe!(
         "id" => [1, 2, 3],
         "name" => ["foo", "bar", "baz"],
         "data" => [42, 43, 44]
     )?;
-    df_to_table(&ctx, df, "t").await?;
+    register_materialized_df(&ctx, df, "t").await?;
     let res = ctx.sql("select * from t order by id").await?;
     assert_batches_eq!(
         &[
@@ -365,14 +365,14 @@ async fn test_df_to_table() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_df_plan_to_table() -> Result<()> {
+async fn test_register_df_view() -> Result<()> {
     let ctx = SessionContext::new();
     let df = dataframe!(
         "id" => [1, 2, 3],
         "name" => ["foo", "bar", "baz"],
         "data" => [42, 43, 44]
     )?;
-    df_plan_to_table(&ctx, df.logical_plan().clone(), "t")?;
+    register_df_view(&ctx, &df,"t")?;
     let res = ctx.sql("select * from t order by id").await?;
     assert_batches_eq!(
         &[

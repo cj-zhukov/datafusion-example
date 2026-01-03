@@ -5,7 +5,7 @@ use datafusion::arrow::array::{ArrayRef, StringArray};
 use datafusion::arrow::datatypes::DataType;
 use datafusion::logical_expr::{ColumnarValue, Volatility};
 use datafusion::prelude::*;
-use datafusion_example::utils::dataframe::df_plan_to_table;
+use datafusion_example::utils::dataframe::register_df_view;
 
 pub async fn udf_example() -> Result<()> {
     split_name().await?;
@@ -98,7 +98,7 @@ async fn split_name_sql() -> Result<()> {
         "id" => [1, 2, 3],
         "name" => ["foo.txt", "bar.txt", "baz.txt"]
     )?;
-    df_plan_to_table(&ctx, df.logical_plan().clone(), "t")?;
+    register_df_view(&ctx, &df, "t")?;
     ctx.register_udf(udf);
     let res = ctx
         .sql("select id, split_text(name) as extension from t")

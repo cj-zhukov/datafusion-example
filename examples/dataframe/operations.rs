@@ -8,7 +8,7 @@ use datafusion::arrow::compute::concat;
 use datafusion::arrow::datatypes::{DataType, Field, Float32Type, Int32Type, Schema};
 use datafusion::scalar::ScalarValue;
 use datafusion::{arrow, assert_batches_eq, prelude::*};
-use datafusion_example::utils::dataframe::df_to_table;
+use datafusion_example::utils::dataframe::register_df_view;
 use datafusion_example::utils::scalarvalue::parse_strings;
 use tokio_stream::StreamExt;
 
@@ -196,7 +196,7 @@ async fn df_cols_to_struct() -> Result<()> {
 
     let ctx = SessionContext::new();
     let df = ctx.read_batch(batch)?;
-    df_to_table(&ctx, df, "t").await?;
+    register_df_view(&ctx, &df, "t")?;
     let res = ctx
         .sql("select id, struct(name as name, data as data) as new_col from t")
         .await?;

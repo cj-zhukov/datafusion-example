@@ -5,7 +5,7 @@ use datafusion::arrow::array::{Float64Array, Int32Array, RecordBatch, StringArra
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::prelude::*;
 
-use datafusion_example::utils::dataframe::df_to_table;
+use datafusion_example::utils::dataframe::register_df_view;
 
 pub async fn least_values_example() -> Result<()> {
     let ctx = SessionContext::new();
@@ -25,7 +25,7 @@ pub async fn least_values_example() -> Result<()> {
     let df = ctx.read_batch(batch.clone())?;
     let table_name = "t";
     let col_val = "id";
-    df_to_table(&ctx, df, table_name).await?;
+    register_df_view(&ctx, &df, table_name)?;
 
     let sql = format!(
         "select *
