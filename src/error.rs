@@ -1,12 +1,6 @@
 use std::io::Error as IoError;
 
 use aws_sdk_s3::error::SdkError;
-use aws_sdk_s3::operation::complete_multipart_upload::CompleteMultipartUploadError;
-use aws_sdk_s3::operation::create_multipart_upload::CreateMultipartUploadError;
-use aws_sdk_s3::operation::get_object::GetObjectError;
-use aws_sdk_s3::operation::list_objects_v2::ListObjectsV2Error;
-use aws_sdk_s3::operation::put_object::PutObjectError;
-use aws_sdk_s3::operation::upload_part::UploadPartError;
 use aws_smithy_types::byte_stream::error::Error as AWSSmithyError;
 use awscreds::error::CredentialsError as AWSCredentialsError;
 use color_eyre::eyre::Report;
@@ -29,35 +23,20 @@ pub enum UtilsError {
     #[error("IO error")]
     IoError(#[from] IoError),
 
-    #[error("AWS GetObjectError")]
-    GetObjectError(#[from] SdkError<GetObjectError>),
-
-    #[error("AWS ListObjectsV2Error")]
-    ListObjectsV2Error(#[from] SdkError<ListObjectsV2Error>),
+    #[error("AWS S3 error")]
+    AwsS3(#[source] Box<dyn std::error::Error + Send + Sync>),
 
     #[error("ObjectStoreError")]
     ObjectStoreError(#[from] ObjectStoreError),
 
-    #[error("AWS CreateMultipartUploadError")]
-    CreateMultipartUploadError(#[from] SdkError<CreateMultipartUploadError>),
-
     #[error("AWSCredentialsError")]
     AWSCredentialsError(#[from] AWSCredentialsError),
-
-    #[error("AWS CompleteMultipartUploadError")]
-    CompleteMultipartUploadError(#[from] SdkError<CompleteMultipartUploadError>),
 
     #[error("DataFusionError")]
     DataFusionError(#[from] DataFusionError),
 
     #[error("ParquetError")]
     ParquetError(#[from] ParquetError),
-
-    #[error("AWS PutObjectError")]
-    PutObjectError(#[from] SdkError<PutObjectError>),
-
-    #[error("AWS UploadPartError")]
-    UploadPartError(#[from] SdkError<UploadPartError>),
 
     #[error("SerdeError")]
     SerdeError(#[from] SerdeError),
@@ -67,4 +46,13 @@ pub enum UtilsError {
 
     #[error("Unexpected error")]
     UnexpectedError(#[source] Report),
+}
+
+impl<E> From<SdkError<E>> for UtilsError
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    fn from(err: SdkError<E>) -> Self {
+        UtilsError::AwsS3(Box::new(err))
+    }
 }

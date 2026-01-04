@@ -8,7 +8,7 @@ use crate::error::UtilsError;
 
 /// Converts a single value from an Arrow array into a ScalarValue
 pub fn try_from_array(array: &ArrayRef, index: usize) -> Result<ScalarValue, UtilsError> {
-    ScalarValue::try_from_array(array, index).map_err(|e| UtilsError::from(e))
+    ScalarValue::try_from_array(array, index).map_err(UtilsError::from)
 }
 
 /// Parses an iterator of &str into an Arrow ArrayRef of the given DataType.
@@ -27,7 +27,7 @@ where
             Ok(Arc::new(arr))
         }
         DataType::Utf8 => {
-            let vec: Vec<Option<&str>> = iter.into_iter().map(|v| Some(v)).collect();
+            let vec: Vec<Option<&str>> = iter.into_iter().map(Some).collect();
             Ok(Arc::new(StringArray::from(vec)))
         }
         _ => unimplemented!(),

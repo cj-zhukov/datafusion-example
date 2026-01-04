@@ -87,11 +87,10 @@ pub fn df_sql(df: DataFrame, sql: &str) -> Result<DataFrame, UtilsError> {
 /// ```
 pub async fn is_empty(df: DataFrame) -> Result<bool, UtilsError> {
     let mut stream = df.execute_stream().await?;
-    if let Some(batch) = stream.next().await.transpose()? {
-        if batch.num_rows() > 0 {
+    if let Some(batch) = stream.next().await.transpose()? 
+        && batch.num_rows() > 0 {
             return Ok(false);
         }
-    }
     Ok(true)
 }
 
@@ -328,7 +327,7 @@ pub async fn df_cols_to_json(
     let json_rows: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice())?;
     let str_rows: Vec<String> = json_rows
         .iter()
-        .map(|row| serde_json::to_string(row))
+        .map(serde_json::to_string)
         .collect::<Result<_, _>>()?;
 
     let mut all_columns = batch.columns().to_vec();
