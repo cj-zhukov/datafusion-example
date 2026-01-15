@@ -21,6 +21,7 @@ use tokio_stream::StreamExt;
 use crate::error::UtilsError;
 
 /// Query dataframe with sql
+/// 
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
@@ -56,6 +57,7 @@ pub fn df_sql(df: DataFrame, sql: &str) -> Result<DataFrame, UtilsError> {
 }
 
 /// Check if dataframe is empty and doesn't have rows
+/// 
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
@@ -95,6 +97,7 @@ pub async fn is_empty(df: DataFrame) -> Result<bool, UtilsError> {
 }
 
 /// Returns column names if the schema is not empty
+/// 
 /// # Examples
 /// ```
 /// # use datafusion_example::utils::dataframe::get_column_names;
@@ -132,6 +135,7 @@ pub fn get_column_names(df: &DataFrame) -> Option<Vec<&str>> {
 }
 
 /// Concatenates arrays per column for dataframe
+/// 
 /// # Examples
 /// ```
 /// # use datafusion_example::utils::dataframe::concat_arrays;
@@ -184,6 +188,7 @@ pub async fn concat_arrays(df: DataFrame) -> Result<Vec<ArrayRef>, UtilsError> {
 }
 
 /// Concatenates batches together into a single RecordBatch
+/// 
 /// # Examples
 /// ```
 /// # use datafusion_example::utils::dataframe::concat_df_batches;
@@ -209,6 +214,7 @@ pub async fn concat_df_batches(df: DataFrame) -> Result<RecordBatch, UtilsError>
 }
 
 /// Concat dataframes with the same schema into one dataframe
+/// 
 /// # Examples
 /// ```
 /// # use datafusion_example::utils::dataframe::concat_dfs;
@@ -260,6 +266,7 @@ async fn collect_batches(dfs: Vec<DataFrame>) -> Result<Vec<RecordBatch>, DataFu
 }
 
 /// Create json like string column new_col from cols
+/// 
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
@@ -346,7 +353,8 @@ pub async fn df_cols_to_json(
     Ok(res)
 }
 
-/// Create nested struct column new_col from cols.
+/// Create nested struct column new_col from cols
+/// 
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
@@ -449,6 +457,7 @@ fn make_new_df(
 }
 
 /// Add column to existing dataframe
+/// 
 /// # Examples
 /// ```
 /// use std::sync::Arc;
@@ -500,6 +509,7 @@ pub async fn add_column_to_df(
 }
 
 /// Add columns to existing dataframe
+/// 
 /// # Examples
 /// ```
 /// use std::sync::Arc;
@@ -598,6 +608,7 @@ pub async fn write_df_to_file(df: DataFrame, file_path: &str) -> Result<(), Util
 }
 
 /// Register a DataFrame as a *materialized* table (executes immediately)
+/// 
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
@@ -636,6 +647,7 @@ pub async fn register_materialized_df(
 }
 
 /// Register a DataFrame as a *lazy view* (no execution)
+/// 
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
@@ -674,6 +686,7 @@ pub fn register_df_view(
 
 /// Convert dataframe to json like data that can be used later to store as string,
 /// note that not all types can be serealized
+/// 
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
@@ -703,6 +716,7 @@ pub async fn df_to_json_bytes(df: DataFrame) -> Result<Vec<u8>, UtilsError> {
 
 /// Join dataframes using same column name,
 /// right columns used by join will be removed
+/// 
 /// # Examples
 /// ```
 /// # use color_eyre::Result;

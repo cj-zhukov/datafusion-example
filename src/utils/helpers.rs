@@ -12,6 +12,7 @@ use rand::prelude::*;
 use crate::{error::UtilsError, utils::dataframe::concat_arrays};
 
 /// Get empty dataframe
+/// 
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
@@ -37,6 +38,7 @@ pub fn get_empty_df(ctx: &SessionContext) -> Result<DataFrame, UtilsError> {
 }
 
 /// Get dataframe with random data
+/// 
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
@@ -125,6 +127,7 @@ pub fn get_random_df(
 }
 
 /// Add auto-increment column to dataframe
+/// 
 /// # Examples
 /// ```
 /// use datafusion::prelude::*;
@@ -182,6 +185,7 @@ pub async fn add_pk_to_df(
 }
 
 /// Add int32 column to existing dataframe
+/// 
 /// # Examples
 /// ```
 /// use datafusion::prelude::*;
@@ -221,6 +225,7 @@ pub async fn add_int_col_to_df(
 }
 
 /// Add string column to existing dataframe
+/// 
 /// # Examples
 /// ```
 /// use datafusion::prelude::*;
@@ -260,6 +265,7 @@ pub async fn add_str_col_to_df(
 }
 
 /// Add any numeric column to existing dataframe
+/// 
 /// # Examples
 /// ```
 /// use datafusion::prelude::*;
@@ -304,6 +310,7 @@ where
 }
 
 /// Add any string column to existing dataframe
+/// 
 /// # Examples
 /// ```
 /// use datafusion::prelude::*;
@@ -348,6 +355,7 @@ where
 }
 
 /// Add column to existing dataframe
+/// 
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
@@ -421,6 +429,7 @@ pub async fn add_col_arr_to_df(
 
 /// Select dataframe with all columns except to_exclude
 /// (better use [`drop_columns`](https://docs.rs/datafusion/latest/datafusion/dataframe/struct.DataFrame.html#method.drop_columns))
+/// 
 /// # Examples
 /// ```
 /// use datafusion::prelude::*;
@@ -465,6 +474,7 @@ pub fn select_all_exclude(df: DataFrame, to_exclude: &[&str]) -> Result<DataFram
 }
 
 /// Extract values from a StructArray as Vec<Vec<String>>, row-wise
+/// 
 /// # Examples
 /// ```
 /// # use std::sync::Arc;

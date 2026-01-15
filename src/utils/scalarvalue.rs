@@ -13,6 +13,22 @@ pub fn try_from_array(array: &ArrayRef, index: usize) -> Result<ScalarValue, Uti
 
 /// Parses an iterator of &str into an Arrow ArrayRef of the given DataType.
 /// This uses Arrow primitives directly.
+///
+/// # Examples
+/// ```
+/// # use datafusion::arrow::array::Int32Array;
+/// # use datafusion::arrow::datatypes::DataType;
+/// # use datafusion_example::utils::scalarvalue::parse_strings;
+/// # use color_eyre::Result;
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
+/// let array = parse_strings(["1", "2", "3"], DataType::Int32)?;
+/// let integers = array.as_any().downcast_ref::<Int32Array>().unwrap();
+/// let vals = integers.values();
+/// assert_eq!(vals, &[1, 2, 3]);
+/// # Ok(())
+/// # }
+/// ```
 pub fn parse_strings<'a, I>(iter: I, to_data_type: DataType) -> Result<ArrayRef, UtilsError>
 where
     I: IntoIterator<Item = &'a str>,
