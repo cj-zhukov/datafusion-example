@@ -4,19 +4,19 @@ version = "1.0.0"
 edition = "2024"
 
 [dependencies]
-arrow-json = "57"
+arrow-json = "58"
 aws-config = "1"
 aws-sdk-s3 = "1"
 aws-creds = "0.38"
 aws-smithy-types = "1"
-datafusion = "52"
+datafusion = "53"
 bytes = "1"
 color-eyre = "0.6"
 chrono = "0.4"
 futures-util = "0.3"
 itertools = "0.13"
-object_store = { version = "0.12", features = ["aws", "cloud"] }
-parquet = "57"
+object_store = { version = "0.13", features = ["aws", "cloud"] }
+parquet = "58"
 rand = "0.9"
 strum = "0.27"
 strum_macros = "0.27"
