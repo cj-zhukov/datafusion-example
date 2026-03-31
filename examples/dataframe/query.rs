@@ -242,11 +242,21 @@ async fn aggregates_example() -> Result<()> {
     .build()?;
 
     let res = df
-        .with_column("cnt", count_window_function)?
-        .with_column("sum_data", sum_window_function)?
-        .with_column("avg_data", avg_window_function)?
+        .clone()
+        .with_column("cnt", count_window_function.clone())?
+        .with_column("sum_data", sum_window_function.clone())?
+        .with_column("avg_data", avg_window_function.clone())?
         .select(vec![col("id"), col("cnt"), col("sum_data"), col("avg_data")])?
         .sort_by(vec![col("id")])?;
+    res.show().await?;
+
+    let res = df.window(vec![
+        count_window_function.alias("cnt"),
+        sum_window_function.alias("sum_data"),
+        avg_window_function.alias("avg_data")
+    ])?
+    .select_columns(&["id", "cnt", "sum_data", "avg_data"])?
+    .sort_by(vec![col("id")])?;
     res.show().await?;
 
     Ok(())
