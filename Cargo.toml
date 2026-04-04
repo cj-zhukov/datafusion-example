@@ -20,6 +20,7 @@ parquet = "58"
 rand = "0.9"
 strum = "0.27"
 strum_macros = "0.27"
+tempfile = "3.27"
 tokio = { version = "1", features = ["full"] }
 time = "0.3"
 tokio-stream = "0.1"
