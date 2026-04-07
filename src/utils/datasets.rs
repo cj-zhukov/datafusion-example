@@ -51,8 +51,7 @@ impl ExampleDataset {
         }
     }
 
-    pub async fn dataframe(self) -> Result<DataFrame, UtilsError> {
-        let ctx = SessionContext::new();
+    pub async fn dataframe(self, ctx: &SessionContext) -> Result<DataFrame, UtilsError> {
         Ok(ctx.read_csv(self.path_str()?, CsvReadOptions::default()).await?)
     }
 }
@@ -131,7 +130,8 @@ mod tests {
     #[tokio::test]
     async fn test_cars_dataset_dataframe() -> Result<(), UtilsError> {
         let cars = ExampleDataset::Cars;
-        let df = cars.dataframe().await?;
+        let ctx = SessionContext::new();
+        let df = cars.dataframe(&ctx).await?;
         let rows = df.sort(vec![col("speed").sort(true, true)])?;
         assert_batches_eq!(
             &[
