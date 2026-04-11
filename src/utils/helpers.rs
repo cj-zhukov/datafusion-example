@@ -133,28 +133,28 @@ pub fn get_random_df(
 /// use datafusion::prelude::*;
 /// # use color_eyre::Result;
 /// # use datafusion_example::utils::helpers::add_pk_to_df;
+/// # use datafusion_example::utils::datasets::ExampleDataset;
+/// # use datafusion::assert_batches_eq;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = dataframe!(
-///     "id" => [1, 2, 3],
-///     "name" => ["foo", "bar", "baz"]
-/// )?;
-/// // +----+------+,
-/// // | id | name |,
-/// // +----+------+,
-/// // | 1  | foo  |,
-/// // | 2  | bar  |,
-/// // | 3  | baz  |,
-/// // +----+------+,
 /// let ctx = SessionContext::new();
+/// let cars = ExampleDataset::Cars;
+/// let df = cars.dataframe(&ctx).await?.sort(vec![col("speed").sort(true, true)])?.limit(0, Some(5))?;
 /// let res = add_pk_to_df(&ctx, df, "pk").await?;
-/// // +----+------+----+
-/// // | id | name | pk |
-/// // +----+------+----+
-/// // | 1  | foo  | 0  |
-/// // | 2  | bar  | 1  |
-/// // | 3  | baz  | 2  |
-/// // +----+------+----+
+/// assert_batches_eq!(
+///  &[  
+///     "+-------+-------+---------------------+----+",
+///    "| car   | speed | time                | pk |",
+///    "+-------+-------+---------------------+----+",
+///    "| red   | 0.0   | 1996-04-12T12:05:15 | 0  |",
+///    "| red   | 1.0   | 1996-04-12T12:05:14 | 1  |",
+///    "| green | 2.0   | 1996-04-12T12:05:14 | 2  |",
+///    "| red   | 3.0   | 1996-04-12T12:05:13 | 3  |",
+///    "| red   | 7.0   | 1996-04-12T12:05:10 | 4  |",
+///    "+-------+-------+---------------------+----+",
+///  ],
+///    &res.collect().await?
+///  );
 /// # Ok(())
 /// # }
 /// ```
@@ -191,19 +191,29 @@ pub async fn add_pk_to_df(
 /// use datafusion::prelude::*;
 /// # use color_eyre::Result;
 /// # use datafusion_example::utils::helpers::add_int_col_to_df;
+/// # use datafusion_example::utils::datasets::ExampleDataset;
+/// # use datafusion::assert_batches_eq;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = dataframe!("id" => [1, 2, 3])?;
 /// let ctx = SessionContext::new();
-/// let data = vec![0, 1, 2];
+/// let cars = ExampleDataset::Cars;
+/// let df = cars.dataframe(&ctx).await?.sort(vec![col("speed").sort(true, true)])?.limit(0, Some(5))?;
+/// let data = vec![0, 1, 2, 3, 4];
 /// let res = add_int_col_to_df(&ctx, df, data, "pk").await?;
-/// // +----+----+
-/// // | id | pk |
-/// // +----+----+
-/// // | 1  | 0  |
-/// // | 2  | 1  |
-/// // | 3  | 2  |
-/// // +----+----+
+/// assert_batches_eq!(
+///  &[  
+///     "+-------+-------+---------------------+----+",
+///    "| car   | speed | time                | pk |",
+///    "+-------+-------+---------------------+----+",
+///    "| red   | 0.0   | 1996-04-12T12:05:15 | 0  |",
+///    "| red   | 1.0   | 1996-04-12T12:05:14 | 1  |",
+///    "| green | 2.0   | 1996-04-12T12:05:14 | 2  |",
+///    "| red   | 3.0   | 1996-04-12T12:05:13 | 3  |",
+///    "| red   | 7.0   | 1996-04-12T12:05:10 | 4  |",
+///    "+-------+-------+---------------------+----+",
+///  ],
+///    &res.collect().await?
+/// );
 /// # Ok(())
 /// # }
 /// ```
@@ -231,19 +241,27 @@ pub async fn add_int_col_to_df(
 /// use datafusion::prelude::*;
 /// # use color_eyre::Result;
 /// # use datafusion_example::utils::helpers::add_str_col_to_df;
+/// # use datafusion_example::utils::datasets::ExampleDataset;
+/// # use datafusion::assert_batches_eq;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = dataframe!("id" => [1, 2, 3])?;
 /// let ctx = SessionContext::new();
+/// let cars = ExampleDataset::Cars;
+/// let df = cars.dataframe(&ctx).await?.sort(vec![col("speed").sort(true, true)])?.limit(0, Some(3))?;
 /// let data = vec!["foo", "bar", "baz"];
 /// let res = add_str_col_to_df(&ctx, df, data, "name").await?;
-/// // +----+------+
-/// // | id | name |
-/// // +----+------+
-/// // | 1  | foo  |
-/// // | 2  | bar  |
-/// // | 3  | baz  |
-/// // +----+------+
+/// assert_batches_eq!(
+///  &[  
+///     "+-------+-------+---------------------+------+",
+///     "| car   | speed | time                | name |",
+///     "+-------+-------+---------------------+------+",
+///     "| red   | 0.0   | 1996-04-12T12:05:15 | foo  |",
+///     "| red   | 1.0   | 1996-04-12T12:05:14 | bar  |",
+///     "| green | 2.0   | 1996-04-12T12:05:14 | baz  |",
+///     "+-------+-------+---------------------+------+",
+///  ],
+///    &res.collect().await?
+/// );
 /// # Ok(())
 /// # }
 /// ```
@@ -273,19 +291,29 @@ pub async fn add_str_col_to_df(
 /// # use datafusion::arrow::datatypes::Int32Type;
 /// # use color_eyre::Result;
 /// # use datafusion_example::utils::helpers::add_any_num_col_to_df;
+/// # use datafusion_example::utils::datasets::ExampleDataset;
+/// # use datafusion::assert_batches_eq;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = dataframe!("id" => [1, 2, 3])?;
 /// let ctx = SessionContext::new();
-/// let data: PrimitiveArray<Int32Type> = vec![0, 1, 2].into();
+/// let cars = ExampleDataset::Cars;
+/// let df = cars.dataframe(&ctx).await?.sort(vec![col("speed").sort(true, true)])?.limit(0, Some(5))?;
+/// let data: PrimitiveArray<Int32Type> = vec![0, 1, 2, 3, 4].into();
 /// let res = add_any_num_col_to_df(&ctx, df, data, "pk").await?;
-/// // +----+----+
-/// // | id | pk |
-/// // +----+----+
-/// // | 1  | 0  |
-/// // | 2  | 1  |
-/// // | 3  | 2  |
-/// // +----+----+
+/// assert_batches_eq!(
+///  &[  
+///     "+-------+-------+---------------------+----+",
+///    "| car   | speed | time                | pk |",
+///    "+-------+-------+---------------------+----+",
+///    "| red   | 0.0   | 1996-04-12T12:05:15 | 0  |",
+///    "| red   | 1.0   | 1996-04-12T12:05:14 | 1  |",
+///    "| green | 2.0   | 1996-04-12T12:05:14 | 2  |",
+///    "| red   | 3.0   | 1996-04-12T12:05:13 | 3  |",
+///    "| red   | 7.0   | 1996-04-12T12:05:10 | 4  |",
+///    "+-------+-------+---------------------+----+",
+///  ],
+///    &res.collect().await?
+/// );
 /// # Ok(())
 /// # }
 /// ```
@@ -318,19 +346,27 @@ where
 /// # use datafusion::arrow::datatypes::Utf8Type;
 /// # use color_eyre::Result;
 /// # use datafusion_example::utils::helpers::add_any_str_col_to_df;
+/// # use datafusion_example::utils::datasets::ExampleDataset;
+/// # use datafusion::assert_batches_eq;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = dataframe!("id" => [1, 2, 3])?;
 /// let ctx = SessionContext::new();
+/// let cars = ExampleDataset::Cars;
+/// let df = cars.dataframe(&ctx).await?.sort(vec![col("speed").sort(true, true)])?.limit(0, Some(3))?;
 /// let data: GenericByteArray<Utf8Type> = vec!["foo", "bar", "baz"].into();
 /// let res = add_any_str_col_to_df(&ctx, df, data, "name").await?;
-/// // +----+------+
-/// // | id | name |
-/// // +----+------+
-/// // | 1  | foo  |
-/// // | 2  | bar  |
-/// // | 3  | baz  |
-/// // +----+------+
+/// assert_batches_eq!(
+///  &[  
+///     "+-------+-------+---------------------+------+",
+///     "| car   | speed | time                | name |",
+///     "+-------+-------+---------------------+------+",
+///     "| red   | 0.0   | 1996-04-12T12:05:15 | foo  |",
+///     "| red   | 1.0   | 1996-04-12T12:05:14 | bar  |",
+///     "| green | 2.0   | 1996-04-12T12:05:14 | baz  |",
+///     "+-------+-------+---------------------+------+",
+///  ],
+///    &res.collect().await?
+/// );
 /// # Ok(())
 /// # }
 /// ```
@@ -362,19 +398,27 @@ where
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::StringArray;
 /// # use datafusion_example::utils::helpers::add_col_arr_to_df;
+/// # use datafusion_example::utils::datasets::ExampleDataset;
+/// # use datafusion::assert_batches_eq;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = dataframe!("id" => [1, 2, 3])?;
-/// let name = StringArray::from(vec!["foo", "bar", "baz"]);
 /// let ctx = SessionContext::new();
+/// let cars = ExampleDataset::Cars;
+/// let df = cars.dataframe(&ctx).await?.sort(vec![col("speed").sort(true, true)])?.limit(0, Some(3))?;
+/// let name = StringArray::from(vec!["foo", "bar", "baz"]);
 /// let res = add_col_arr_to_df(&ctx, df, &name, "name").await?;
-/// // +----+------+,
-/// // | id | name |,
-/// // +----+------+,
-/// // | 1  | foo  |,
-/// // | 2  | bar  |,
-/// // | 3  | baz  |,
-/// // +----+------+,
+/// assert_batches_eq!(
+///  &[  
+///     "+-------+-------+---------------------+------+",
+///     "| car   | speed | time                | name |",
+///     "+-------+-------+---------------------+------+",
+///     "| red   | 0.0   | 1996-04-12T12:05:15 | foo  |",
+///     "| red   | 1.0   | 1996-04-12T12:05:14 | bar  |",
+///     "| green | 2.0   | 1996-04-12T12:05:14 | baz  |",
+///     "+-------+-------+---------------------+------+",
+///  ],
+///    &res.collect().await?
+/// );
 /// # Ok(())
 /// # }
 /// ```
@@ -435,29 +479,26 @@ pub async fn add_col_arr_to_df(
 /// use datafusion::prelude::*;
 /// # use color_eyre::Result;
 /// # use datafusion_example::utils::helpers::select_all_exclude;
+/// # use datafusion_example::utils::datasets::ExampleDataset;
+/// # use datafusion::assert_batches_eq;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = dataframe!(
-///     "id" => [1, 2, 3],
-///     "name" => ["foo", "bar", "baz"],
-///     "data" => [42, 43, 44]
-/// )?;
-/// // +----+------+------+
-/// // | id | name | data |
-/// // +----+------+------+
-/// // | 1  | foo  | 42   |
-/// // | 2  | bar  | 43   |
-/// // | 3  | baz  | 44   |
-/// // +----+------+------+
 /// let ctx = SessionContext::new();
-/// let res = select_all_exclude(df, &["name", "data"])?;
-/// // +----+
-/// // | id |
-/// // +----+
-/// // | 1  |
-/// // | 2  |
-/// // | 3  |
-/// // +----+
+/// let cars = ExampleDataset::Cars;
+/// let df = cars.dataframe(&ctx).await?.sort(vec![col("speed").sort(true, true)])?.limit(0, Some(3))?;
+/// let res = select_all_exclude(df, &["speed", "time"])?;
+/// assert_batches_eq!(
+///  &[  
+///    "+-------+",
+///    "| car   |",
+///    "+-------+",
+///    "| red   |",
+///    "| red   |",
+///    "| green |",
+///    "+-------+",
+///  ],
+///    &res.collect().await?
+/// );
 /// # Ok(())
 /// # }
 /// ```
