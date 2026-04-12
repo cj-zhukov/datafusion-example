@@ -27,26 +27,40 @@ use crate::error::UtilsError;
 /// # use color_eyre::Result;
 /// # use datafusion_example::utils::dataframe::df_sql;
 /// use datafusion::prelude::*;
+/// # use datafusion_example::utils::datasets::ExampleDataset;
+/// # use datafusion::assert_batches_eq;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = dataframe!(
-///     "id" => [1, 2, 3],
-///     "name" => ["foo", "bar", "baz"]
-/// )?;
-/// // +----+------+,
-/// // | id | name |,
-/// // +----+------+,
-/// // | 1  | foo  |,
-/// // | 2  | bar  |,
-/// // | 3  | baz  |,
-/// // +----+------+,
-/// let sql = r#"id > 2 and name in ('foo', 'bar', 'baz')"#;
+/// let ctx = SessionContext::new();
+/// let cars = ExampleDataset::Cars;
+/// let df = cars.dataframe(&ctx).await?;
+/// let sql = r#"speed > 10 and car in ('red', 'green')"#;
 /// let res = df_sql(df, sql)?;
-/// // +----+------+,
-/// // | id | name |,
-/// // +----+------+,
-/// // | 3  | baz  |,
-/// // +----+------+,
+/// assert_batches_eq!(
+///  &[  
+///    "+-------+-------+---------------------+",
+///    "| car   | speed | time                |",
+///    "+-------+-------+---------------------+",
+///    "| red   | 20.0  | 1996-04-12T12:05:03 |",
+///    "| red   | 20.3  | 1996-04-12T12:05:04 |",
+///    "| red   | 21.4  | 1996-04-12T12:05:05 |",
+///    "| red   | 21.5  | 1996-04-12T12:05:06 |",
+///    "| red   | 19.0  | 1996-04-12T12:05:07 |",
+///    "| red   | 18.0  | 1996-04-12T12:05:08 |",
+///    "| red   | 17.0  | 1996-04-12T12:05:09 |",
+///    "| green | 10.3  | 1996-04-12T12:05:04 |",
+///    "| green | 10.4  | 1996-04-12T12:05:05 |",
+///    "| green | 10.5  | 1996-04-12T12:05:06 |",
+///    "| green | 11.0  | 1996-04-12T12:05:07 |",
+///    "| green | 12.0  | 1996-04-12T12:05:08 |",
+///    "| green | 14.0  | 1996-04-12T12:05:09 |",
+///    "| green | 15.0  | 1996-04-12T12:05:10 |",
+///    "| green | 15.1  | 1996-04-12T12:05:11 |",
+///    "| green | 15.2  | 1996-04-12T12:05:12 |",
+///    "+-------+-------+---------------------+",
+///  ],
+///    &res.collect().await?
+///  );
 /// # Ok(())
 /// # }
 /// ```
@@ -65,12 +79,12 @@ pub fn df_sql(df: DataFrame, sql: &str) -> Result<DataFrame, UtilsError> {
 /// use datafusion::prelude::*;
 /// # use datafusion::arrow::{array::RecordBatch, datatypes::Schema};
 /// # use std::sync::Arc;
+/// # use datafusion_example::utils::datasets::ExampleDataset;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = dataframe!(
-///     "id" => [1, 2, 3],
-///     "name" => ["foo", "bar", "baz"]
-/// )?;
+/// let ctx = SessionContext::new();
+/// let cars = ExampleDataset::Cars;
+/// let df = cars.dataframe(&ctx).await?;
 /// assert_eq!(is_empty(df).await?, false);
 ///
 /// let df = dataframe!("id" => [None::<i32>])?;
@@ -103,21 +117,14 @@ pub async fn is_empty(df: DataFrame) -> Result<bool, UtilsError> {
 /// # use datafusion_example::utils::dataframe::get_column_names;
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
+/// # use datafusion_example::utils::datasets::ExampleDataset;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = dataframe!(
-///     "id" => [1, 2, 3],
-///     "name" => ["foo", "bar", "baz"]
-/// )?;
-/// // +----+------+,
-/// // | id | name |,
-/// // +----+------+,
-/// // | 1  | foo  |,
-/// // | 2  | bar  |,
-/// // | 3  | baz  |,
-/// // +----+------+,
+/// let ctx = SessionContext::new();
+/// let cars = ExampleDataset::Cars;
+/// let df = cars.dataframe(&ctx).await?;
 /// let columns = get_column_names(&df);
-/// assert_eq!(columns, Some(vec!["id", "name"]));
+/// assert_eq!(columns, Some(vec!["car", "speed", "time"]));
 /// # Ok(())
 /// # }
 /// ```
@@ -135,36 +142,55 @@ pub fn get_column_names(df: &DataFrame) -> Option<Vec<&str>> {
 }
 
 /// Concatenates arrays per column for dataframe
-/// 
+///
 /// # Examples
 /// ```
-/// # use datafusion_example::utils::dataframe::concat_arrays;
-/// # use datafusion::arrow::array::{Int32Array, StringArray};
-/// # use color_eyre::Result;
+/// use std::sync::Arc;
 /// use datafusion::prelude::*;
+/// use datafusion::arrow::array::{Int32Array, StringArray};
+/// use datafusion::arrow::datatypes::{DataType, Field, Schema};
+/// use datafusion::arrow::record_batch::RecordBatch;
+/// use datafusion_example::utils::dataframe::concat_arrays;
+/// use color_eyre::Result;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = dataframe!(
-///     "id" => [1, 2, 3],
-///     "name" => ["foo", "bar", "baz"]
+/// let ctx = SessionContext::new();
+/// let schema = Arc::new(Schema::new(vec![
+///     Field::new("id", DataType::Int32, false),
+///     Field::new("name", DataType::Utf8, false),
+/// ]));
+///
+/// let batch1 = RecordBatch::try_new(
+///     schema.clone(),
+///     vec![
+///         Arc::new(Int32Array::from(vec![1, 2])),
+///         Arc::new(StringArray::from(vec!["foo", "bar"])),
+///     ],
 /// )?;
+///
+/// let batch2 = RecordBatch::try_new(
+///     schema.clone(),
+///     vec![
+///         Arc::new(Int32Array::from(vec![3])),
+///         Arc::new(StringArray::from(vec!["baz"])),
+///     ],
+/// )?;
+///
+/// let df = ctx.read_batches(vec![batch1, batch2])?;
 /// let arrays = concat_arrays(df).await?;
 /// assert_eq!(arrays.len(), 2);
 ///
-/// let id_array = arrays[0]
+/// let ids = arrays[0]
 ///     .as_any()
 ///     .downcast_ref::<Int32Array>()
 ///     .unwrap();
-/// assert_eq!(id_array.values(), &[1, 2, 3]);
+/// assert_eq!(ids.values(), &[1, 2, 3]);
 ///
-/// let name_array = arrays[1]
+/// let names = arrays[1]
 ///     .as_any()
 ///     .downcast_ref::<StringArray>()
 ///     .unwrap();
-/// let values: Vec<String> = name_array
-///     .iter()
-///     .map(|v| v.unwrap_or_default().to_string())
-///     .collect();
+/// let values: Vec<_> = names.iter().map(|v| v.unwrap()).collect();
 /// assert_eq!(values, ["foo", "bar", "baz"]);
 /// # Ok(())
 /// # }
@@ -194,15 +220,31 @@ pub async fn concat_arrays(df: DataFrame) -> Result<Vec<ArrayRef>, UtilsError> {
 /// # use datafusion_example::utils::dataframe::concat_df_batches;
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
+/// # use datafusion::arrow::array::{Float64Array, StringArray};
+/// # use datafusion_example::utils::datasets::ExampleDataset;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = dataframe!(
-///     "id" => [1, 2, 3],
-///     "name" => ["foo", "bar", "baz"]
-/// )?;
+/// let ctx = SessionContext::new();
+/// let cars = ExampleDataset::Cars;
+/// let df = cars.dataframe(&ctx).await?.sort(vec![col("speed").sort(true, true)])?.limit(0, Some(5))?;
 /// let batch = concat_df_batches(df).await?;
-/// assert_eq!(batch.num_columns(), 2);
-/// assert_eq!(batch.num_rows(), 3);
+/// assert_eq!(batch.num_columns(), 3);
+/// assert_eq!(batch.num_rows(), 5);
+///
+/// let cars = batch
+///     .column(0)
+///     .as_any()
+///     .downcast_ref::<StringArray>()
+///     .unwrap();
+/// let values: Vec<_> = cars.iter().map(|v| v.unwrap()).collect();
+/// assert_eq!(values, ["red", "red", "green", "red", "red"]);
+// 
+/// let speed = batch
+///     .column(1)
+///     .as_any()
+///     .downcast_ref::<Float64Array>()
+///     .unwrap();
+/// assert_eq!(speed.values(), &[0.0, 1.0, 2.0, 3.0, 7.0]);
 /// # Ok(())
 /// # }
 /// ```
@@ -220,28 +262,28 @@ pub async fn concat_df_batches(df: DataFrame) -> Result<RecordBatch, UtilsError>
 /// # use datafusion_example::utils::dataframe::concat_dfs;
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
+/// # use datafusion_example::utils::datasets::ExampleDataset;
+/// # use datafusion::assert_batches_eq;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df1 = dataframe!(
-///     "id" => [1, 2, 3],
-///     "name" => ["foo", "bar", "baz"]
-/// )?;
-/// let df2 = dataframe!(
-///     "id" => [1, 2, 3],
-///     "name" => ["foo", "bar", "baz"]
-/// )?;
 /// let ctx = SessionContext::new();
-/// let res = concat_dfs(&ctx, vec![df1, df2]).await?;
-/// // +----+------+
-/// // | id | name |
-/// // +----+------+
-/// // | 1  | foo  |
-/// // | 2  | bar  |
-/// // | 3  | baz  |
-/// // | 1  | foo  |
-/// // | 2  | bar  |
-/// // | 3  | baz  |
-/// // +----+------+
+/// let cars = ExampleDataset::Cars;
+/// let df1 = cars.dataframe(&ctx).await?;
+/// let df2 = df1.clone();
+/// let res = concat_dfs(&ctx, vec![df1, df2]).await?.sort(vec![col("speed").sort(true, true)])?.limit(0, Some(4))?;
+/// assert_batches_eq!(
+///  &[  
+///     "+-----+-------+---------------------+",
+///     "| car | speed | time                |",
+///     "+-----+-------+---------------------+",
+///     "| red | 0.0   | 1996-04-12T12:05:15 |",
+///     "| red | 0.0   | 1996-04-12T12:05:15 |",
+///     "| red | 1.0   | 1996-04-12T12:05:14 |",
+///     "| red | 1.0   | 1996-04-12T12:05:14 |",
+///     "+-----+-------+---------------------+",
+///  ],
+///    &res.collect().await?
+///  );
 /// # Ok(())
 /// # }
 /// ```
@@ -272,29 +314,48 @@ async fn collect_batches(dfs: Vec<DataFrame>) -> Result<Vec<RecordBatch>, DataFu
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
 /// # use datafusion_example::utils::dataframe::df_cols_to_json;
+/// # use datafusion_example::utils::datasets::ExampleDataset;
+/// # use datafusion::assert_batches_eq;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = dataframe!(
-///     "id" => [1, 2, 3],
-///     "name" => [Some("foo"), Some("bar"), None],
-///     "data" => [42, 43, 44]
-/// )?;
-/// // +----+------+------+
-/// // | id | name | data |
-/// // +----+------+------+
-/// // | 1  | foo  | 42   |
-/// // | 2  | bar  | 43   |
-/// // | 3  |      | 44   |
-/// // +----+------+------+
 /// let ctx = SessionContext::new();
-/// let res = df_cols_to_json(&ctx, df, &["name", "data"], "new_col").await?;
-/// // +----+--------------------------+,
-/// // | id | new_col                  |,
-/// // +----+--------------------------+,
-/// // | 1  | {"data":42,"name":"foo"} |,
-/// // | 2  | {"data":43,"name":"bar"} |,
-/// // | 3  | {"data":44}              |,
-/// // +----+--------------------------+,
+/// let cars = ExampleDataset::Cars;
+/// let df = cars.dataframe(&ctx).await?;
+/// let res = df_cols_to_json(&ctx, df, &["car", "speed"], "new_col").await?.sort(vec![col("time").sort(true, true)])?;
+/// assert_batches_eq!(
+///  &[  
+///     "+---------------------+------------------------------+",
+///     "| time                | new_col                      |",
+///     "+---------------------+------------------------------+",
+///     "| 1996-04-12T12:05:03 | {\"car\":\"red\",\"speed\":20.0}   |",
+///     "| 1996-04-12T12:05:03 | {\"car\":\"green\",\"speed\":10.0} |",
+///     "| 1996-04-12T12:05:04 | {\"car\":\"red\",\"speed\":20.3}   |",
+///     "| 1996-04-12T12:05:04 | {\"car\":\"green\",\"speed\":10.3} |",
+///     "| 1996-04-12T12:05:05 | {\"car\":\"red\",\"speed\":21.4}   |",
+///     "| 1996-04-12T12:05:05 | {\"car\":\"green\",\"speed\":10.4} |",
+///     "| 1996-04-12T12:05:06 | {\"car\":\"red\",\"speed\":21.5}   |",
+///     "| 1996-04-12T12:05:06 | {\"car\":\"green\",\"speed\":10.5} |",
+///     "| 1996-04-12T12:05:07 | {\"car\":\"red\",\"speed\":19.0}   |",
+///     "| 1996-04-12T12:05:07 | {\"car\":\"green\",\"speed\":11.0} |",
+///     "| 1996-04-12T12:05:08 | {\"car\":\"red\",\"speed\":18.0}   |",
+///     "| 1996-04-12T12:05:08 | {\"car\":\"green\",\"speed\":12.0} |",
+///     "| 1996-04-12T12:05:09 | {\"car\":\"red\",\"speed\":17.0}   |",
+///     "| 1996-04-12T12:05:09 | {\"car\":\"green\",\"speed\":14.0} |",
+///     "| 1996-04-12T12:05:10 | {\"car\":\"red\",\"speed\":7.0}    |",
+///     "| 1996-04-12T12:05:10 | {\"car\":\"green\",\"speed\":15.0} |",
+///     "| 1996-04-12T12:05:11 | {\"car\":\"red\",\"speed\":7.1}    |",
+///     "| 1996-04-12T12:05:11 | {\"car\":\"green\",\"speed\":15.1} |",
+///     "| 1996-04-12T12:05:12 | {\"car\":\"red\",\"speed\":7.2}    |",
+///     "| 1996-04-12T12:05:12 | {\"car\":\"green\",\"speed\":15.2} |",
+///     "| 1996-04-12T12:05:13 | {\"car\":\"red\",\"speed\":3.0}    |",
+///     "| 1996-04-12T12:05:13 | {\"car\":\"green\",\"speed\":8.0}  |",
+///     "| 1996-04-12T12:05:14 | {\"car\":\"red\",\"speed\":1.0}    |",
+///     "| 1996-04-12T12:05:14 | {\"car\":\"green\",\"speed\":2.0}  |",
+///     "| 1996-04-12T12:05:15 | {\"car\":\"red\",\"speed\":0.0}    |",
+///     "+---------------------+------------------------------+",
+///  ],
+///    &res.collect().await?
+///  );
 /// # Ok(())
 /// # }
 /// ```
@@ -360,31 +421,50 @@ pub async fn df_cols_to_json(
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
 /// # use datafusion_example::utils::dataframe::df_cols_to_struct;
+/// # use datafusion_example::utils::datasets::ExampleDataset;
+/// # use datafusion::assert_batches_eq;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = dataframe!(
-///     "id" => [1, 2, 3],
-///     "name" => ["foo", "bar", "baz"],
-///     "data" => [42, 43, 44]
-/// )?;
-/// // +----+------+------+
-/// // | id | name | data |
-/// // +----+------+------+
-/// // | 1  | foo  | 42   |
-/// // | 2  | bar  | 43   |
-/// // | 3  | baz  | 44   |
-/// // +----+------+------+
 /// let ctx = SessionContext::new();
-/// let res = df_cols_to_struct(&ctx, df, &["name", "data"], "new_col").await?;
-/// // +----+-----------------------+
-/// // | id | new_col               |
-/// // +----+-----------------------+
-/// // | 1  | {name: foo, data: 42} |
-/// // | 2  | {name: bar, data: 43} |
-/// // | 3  | {name: baz, data: 44} |
-/// // +----+-----------------------+
+/// let cars = ExampleDataset::Cars;
+/// let df = cars.dataframe(&ctx).await?;
+/// let res = df_cols_to_struct(&ctx, df, &["car", "speed"], "new_col").await?.sort(vec![col("time").sort(true, true)])?;
+/// assert_batches_eq!(
+///  &[  
+///     "+---------------------+---------------------------+",
+///     "| time                | new_col                   |",
+///     "+---------------------+---------------------------+",
+///     "| 1996-04-12T12:05:03 | {car: red, speed: 20.0}   |",
+///     "| 1996-04-12T12:05:03 | {car: green, speed: 10.0} |",
+///     "| 1996-04-12T12:05:04 | {car: red, speed: 20.3}   |",
+///     "| 1996-04-12T12:05:04 | {car: green, speed: 10.3} |",
+///     "| 1996-04-12T12:05:05 | {car: red, speed: 21.4}   |",
+///     "| 1996-04-12T12:05:05 | {car: green, speed: 10.4} |",
+///     "| 1996-04-12T12:05:06 | {car: red, speed: 21.5}   |",
+///     "| 1996-04-12T12:05:06 | {car: green, speed: 10.5} |",
+///     "| 1996-04-12T12:05:07 | {car: red, speed: 19.0}   |",
+///     "| 1996-04-12T12:05:07 | {car: green, speed: 11.0} |",
+///     "| 1996-04-12T12:05:08 | {car: red, speed: 18.0}   |",
+///     "| 1996-04-12T12:05:08 | {car: green, speed: 12.0} |",
+///     "| 1996-04-12T12:05:09 | {car: red, speed: 17.0}   |",
+///     "| 1996-04-12T12:05:09 | {car: green, speed: 14.0} |",
+///     "| 1996-04-12T12:05:10 | {car: red, speed: 7.0}    |",
+///     "| 1996-04-12T12:05:10 | {car: green, speed: 15.0} |",
+///     "| 1996-04-12T12:05:11 | {car: red, speed: 7.1}    |",
+///     "| 1996-04-12T12:05:11 | {car: green, speed: 15.1} |",
+///     "| 1996-04-12T12:05:12 | {car: red, speed: 7.2}    |",
+///     "| 1996-04-12T12:05:12 | {car: green, speed: 15.2} |",
+///     "| 1996-04-12T12:05:13 | {car: red, speed: 3.0}    |",
+///     "| 1996-04-12T12:05:13 | {car: green, speed: 8.0}  |",
+///     "| 1996-04-12T12:05:14 | {car: red, speed: 1.0}    |",
+///     "| 1996-04-12T12:05:14 | {car: green, speed: 2.0}  |",
+///     "| 1996-04-12T12:05:15 | {car: red, speed: 0.0}    |",
+///     "+---------------------+---------------------------+",
+///  ],
+///    &res.collect().await?
+///  );
 /// // Can de done using 'struct' in query:
-/// // let res = ctx.sql("select id, struct(name as name, data as data) as new_col from t").await?;
+/// // let res = ctx.sql("select time, struct(car as car, speed as speed) as new_col from cars").await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -465,19 +545,27 @@ fn make_new_df(
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{ArrayRef, StringArray};
 /// # use datafusion_example::utils::dataframe::add_column_to_df;
+/// # use datafusion_example::utils::datasets::ExampleDataset;
+/// # use datafusion::assert_batches_eq;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = dataframe!("id" => [1, 2, 3])?;
-/// let name: ArrayRef = Arc::new(StringArray::from(vec!["foo", "bar", "baz"]));
 /// let ctx = SessionContext::new();
+/// let cars = ExampleDataset::Cars;
+/// let df = cars.dataframe(&ctx).await?.limit(0, Some(3))?;
+/// let name: ArrayRef = Arc::new(StringArray::from(vec!["foo", "bar", "baz"]));
 /// let res = add_column_to_df(&ctx, df, name, "name").await?;
-/// // +----+------+,
-/// // | id | name |,
-/// // +----+------+,
-/// // | 1  | foo  |,
-/// // | 2  | bar  |,
-/// // | 3  | baz  |,
-/// // +----+------+,
+/// assert_batches_eq!(
+///  &[  
+///     "+-----+-------+---------------------+------+",
+///     "| car | speed | time                | name |",
+///     "+-----+-------+---------------------+------+",
+///     "| red | 20.0  | 1996-04-12T12:05:03 | foo  |",
+///     "| red | 20.3  | 1996-04-12T12:05:04 | bar  |",
+///     "| red | 21.4  | 1996-04-12T12:05:05 | baz  |",
+///     "+-----+-------+---------------------+------+",
+///  ],
+///    &res.collect().await?
+///  );
 /// # Ok(())
 /// # }
 /// ```
@@ -517,20 +605,29 @@ pub async fn add_column_to_df(
 /// use datafusion::prelude::*;
 /// use datafusion::arrow::array::{ArrayRef, Int32Array, StringArray};
 /// # use datafusion_example::utils::dataframe::add_columns_to_df;
+/// # use datafusion_example::utils::datasets::ExampleDataset;
+/// # use datafusion::assert_batches_eq;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = dataframe!("id" => [1, 2, 3])?;
+/// let ctx = SessionContext::new();
+/// let cars = ExampleDataset::Cars;
+/// let df = cars.dataframe(&ctx).await?.limit(0, Some(3))?;
 /// let name: ArrayRef = Arc::new(StringArray::from(vec!["foo", "bar", "baz"]));
 /// let data: ArrayRef = Arc::new(Int32Array::from(vec![42, 43, 44]));
 /// let ctx = SessionContext::new();
 /// let res = add_columns_to_df(&ctx, df, &[("name", name), ("data", data)]).await?;
-/// // +----+------+------+
-/// // | id | name | data |
-/// // +----+------+------+
-/// // | 1  | foo  | 42   |
-/// // | 2  | bar  | 43   |
-/// // | 3  | baz  | 44   |
-/// // +----+------+------+
+/// assert_batches_eq!(
+///  &[  
+///     "+-----+-------+---------------------+------+------+",
+///     "| car | speed | time                | name | data |",
+///     "+-----+-------+---------------------+------+------+",
+///     "| red | 20.0  | 1996-04-12T12:05:03 | foo  | 42   |",
+///     "| red | 20.3  | 1996-04-12T12:05:04 | bar  | 43   |",
+///     "| red | 21.4  | 1996-04-12T12:05:05 | baz  | 44   |",
+///     "+-----+-------+---------------------+------+------+",
+///  ],
+///    &res.collect().await?
+///  );
 /// # Ok(())
 /// # }
 /// ```
@@ -614,23 +711,27 @@ pub async fn write_df_to_file(df: DataFrame, file_path: &str) -> Result<(), Util
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
 /// # use datafusion_example::utils::dataframe::register_materialized_df;
+/// # use datafusion_example::utils::datasets::ExampleDataset;
+/// # use datafusion::assert_batches_eq;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = dataframe!(
-///     "id" => [1, 2, 3],
-///     "name" => ["foo", "bar", "baz"],
-///     "data" => [42, 43, 44]
-/// )?;
 /// let ctx = SessionContext::new();
-/// register_materialized_df(&ctx, df, "foo").await?;
-/// let res = ctx.sql("select * from foo").await?;
-/// // +----+------+------+
-/// // | id | name | data |
-/// // +----+------+------+
-/// // | 1  | foo  | 42   |
-/// // | 2  | bar  | 43   |
-/// // | 3  | baz  | 44   |
-/// // +----+------+------+
+/// let cars = ExampleDataset::Cars;
+/// let df = cars.dataframe(&ctx).await?;
+/// register_materialized_df(&ctx, df, "cars").await?;
+/// let res = ctx.sql("select * from cars limit 3").await?;
+/// assert_batches_eq!(
+///  &[  
+///     "+-----+-------+---------------------+",
+///     "| car | speed | time                |",
+///     "+-----+-------+---------------------+",
+///     "| red | 20.0  | 1996-04-12T12:05:03 |",
+///     "| red | 20.3  | 1996-04-12T12:05:04 |",
+///     "| red | 21.4  | 1996-04-12T12:05:05 |",
+///     "+-----+-------+---------------------+",
+///  ],
+///    &res.collect().await?
+///  );
 /// # Ok(())
 /// # }
 /// ```
@@ -653,23 +754,27 @@ pub async fn register_materialized_df(
 /// # use color_eyre::Result;
 /// use datafusion::prelude::*;
 /// # use datafusion_example::utils::dataframe::register_df_view;
+/// # use datafusion_example::utils::datasets::ExampleDataset;
+/// # use datafusion::assert_batches_eq;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = dataframe!(
-///     "id" => [1, 2, 3],
-///     "name" => ["foo", "bar", "baz"],
-///     "data" => [42, 43, 44]
-/// )?;
 /// let ctx = SessionContext::new();
-/// register_df_view(&ctx, &df, "foo")?;
-/// let res = ctx.sql("select * from foo").await?;
-/// // +----+------+------+
-/// // | id | name | data |
-/// // +----+------+------+
-/// // | 1  | foo  | 42   |
-/// // | 2  | bar  | 43   |
-/// // | 3  | baz  | 44   |
-/// // +----+------+------+
+/// let cars = ExampleDataset::Cars;
+/// let df = cars.dataframe(&ctx).await?;
+/// register_df_view(&ctx, &df, "cars")?;
+/// let res = ctx.sql("select * from cars limit 3").await?;
+/// assert_batches_eq!(
+///  &[  
+///     "+-----+-------+---------------------+",
+///     "| car | speed | time                |",
+///     "+-----+-------+---------------------+",
+///     "| red | 20.0  | 1996-04-12T12:05:03 |",
+///     "| red | 20.3  | 1996-04-12T12:05:04 |",
+///     "| red | 21.4  | 1996-04-12T12:05:05 |",
+///     "+-----+-------+---------------------+",
+///  ],
+///    &res.collect().await?
+///  );
 /// # Ok(())
 /// # }
 /// ```
@@ -693,12 +798,15 @@ pub fn register_df_view(
 /// use datafusion::prelude::*;
 /// use serde_json::Value;
 /// # use datafusion_example::utils::dataframe::df_to_json_bytes;
+/// # use datafusion_example::utils::datasets::ExampleDataset;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
-/// let df = dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?;
+/// let ctx = SessionContext::new();
+/// let cars = ExampleDataset::Cars;
+/// let df = cars.dataframe(&ctx).await?.sort(vec![col("speed").sort(true, true)])?.limit(0, Some(3))?;
 /// let res = df_to_json_bytes(df).await?;
 /// let value: Value = serde_json::from_slice(&res)?;
-/// assert_eq!(value.to_string(), r#"[{"id":1,"name":"foo"},{"id":2,"name":"bar"},{"id":3,"name":"baz"}]"#);
+/// assert_eq!(value.to_string(), r#"[{"car":"red","speed":0.0,"time":"1996-04-12T12:05:15"},{"car":"red","speed":1.0,"time":"1996-04-12T12:05:14"},{"car":"green","speed":2.0,"time":"1996-04-12T12:05:14"}]"#);
 /// # Ok(())
 /// # }
 /// ```
@@ -723,17 +831,29 @@ pub async fn df_to_json_bytes(df: DataFrame) -> Result<Vec<u8>, UtilsError> {
 /// use datafusion::prelude::*;
 /// use serde_json::Value;
 /// # use datafusion_example::utils::dataframe::join_dfs;
-/// # fn main() -> Result<()> {
-/// let df1 = dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?;
-/// let df2 = dataframe!("id" => [1, 2, 3],"data" => [42, 43, 44])?;
-/// let res = join_dfs(vec![df1, df2], &["id"])?;
-/// // +----+------+------+
-/// // | id | name | data |
-/// // +----+------+------+
-/// // | 1  | foo  | 42   |
-/// // | 2  | bar  | 43   |
-/// // | 3  | baz  | 44   |
-/// // +----+------+------+
+/// # use datafusion_example::utils::datasets::ExampleDataset;
+/// # use datafusion::assert_batches_eq;
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
+/// let ctx = SessionContext::new();
+/// let cars = ExampleDataset::Cars;
+/// let df1 = cars.dataframe(&ctx).await?.sort(vec![col("speed").sort(true, true)])?.limit(0, Some(3))?;
+/// let df2 = df1.clone().select(vec![col("car"), col("speed").alias("speed2"), col("time").alias("time2")])?;
+/// let res = join_dfs(vec![df1, df2], &["car"])?;
+/// assert_batches_eq!(
+///  &[  
+///     "+-------+-------+---------------------+--------+---------------------+",
+///     "| car   | speed | time                | speed2 | time2               |",
+///     "+-------+-------+---------------------+--------+---------------------+",
+///     "| red   | 0.0   | 1996-04-12T12:05:15 | 0.0    | 1996-04-12T12:05:15 |",
+///     "| red   | 1.0   | 1996-04-12T12:05:14 | 0.0    | 1996-04-12T12:05:15 |",
+///     "| red   | 0.0   | 1996-04-12T12:05:15 | 1.0    | 1996-04-12T12:05:14 |",
+///     "| red   | 1.0   | 1996-04-12T12:05:14 | 1.0    | 1996-04-12T12:05:14 |",
+///     "| green | 2.0   | 1996-04-12T12:05:14 | 2.0    | 1996-04-12T12:05:14 |",
+///     "+-------+-------+---------------------+--------+---------------------+",
+///  ],
+///    &res.collect().await?
+///  );
 /// # Ok(())
 /// # }
 /// ```
