@@ -21,7 +21,7 @@ use tokio_stream::StreamExt;
 use crate::error::UtilsError;
 
 /// Query dataframe with sql
-/// 
+///
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
@@ -71,7 +71,7 @@ pub fn df_sql(df: DataFrame, sql: &str) -> Result<DataFrame, UtilsError> {
 }
 
 /// Check if dataframe is empty and doesn't have rows
-/// 
+///
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
@@ -103,15 +103,16 @@ pub fn df_sql(df: DataFrame, sql: &str) -> Result<DataFrame, UtilsError> {
 /// ```
 pub async fn is_empty(df: DataFrame) -> Result<bool, UtilsError> {
     let mut stream = df.execute_stream().await?;
-    if let Some(batch) = stream.next().await.transpose()? 
-        && batch.num_rows() > 0 {
-            return Ok(false);
-        }
+    if let Some(batch) = stream.next().await.transpose()?
+        && batch.num_rows() > 0
+    {
+        return Ok(false);
+    }
     Ok(true)
 }
 
 /// Returns column names if the schema is not empty
-/// 
+///
 /// # Examples
 /// ```
 /// # use datafusion_example::utils::dataframe::get_column_names;
@@ -214,7 +215,7 @@ pub async fn concat_arrays(df: DataFrame) -> Result<Vec<ArrayRef>, UtilsError> {
 }
 
 /// Concatenates batches together into a single RecordBatch
-/// 
+///
 /// # Examples
 /// ```
 /// # use datafusion_example::utils::dataframe::concat_df_batches;
@@ -238,7 +239,7 @@ pub async fn concat_arrays(df: DataFrame) -> Result<Vec<ArrayRef>, UtilsError> {
 ///     .unwrap();
 /// let values: Vec<_> = cars.iter().map(|v| v.unwrap()).collect();
 /// assert_eq!(values, ["red", "red", "green", "red", "red"]);
-// 
+//
 /// let speed = batch
 ///     .column(1)
 ///     .as_any()
@@ -256,7 +257,7 @@ pub async fn concat_df_batches(df: DataFrame) -> Result<RecordBatch, UtilsError>
 }
 
 /// Concat dataframes with the same schema into one dataframe
-/// 
+///
 /// # Examples
 /// ```
 /// # use datafusion_example::utils::dataframe::concat_dfs;
@@ -308,7 +309,7 @@ async fn collect_batches(dfs: Vec<DataFrame>) -> Result<Vec<RecordBatch>, DataFu
 }
 
 /// Create json like string column new_col from cols
-/// 
+///
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
@@ -415,7 +416,7 @@ pub async fn df_cols_to_json(
 }
 
 /// Create nested struct column new_col from cols
-/// 
+///
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
@@ -537,7 +538,7 @@ fn make_new_df(
 }
 
 /// Add column to existing dataframe
-/// 
+///
 /// # Examples
 /// ```
 /// use std::sync::Arc;
@@ -597,7 +598,7 @@ pub async fn add_column_to_df(
 }
 
 /// Add columns to existing dataframe
-/// 
+///
 /// # Examples
 /// ```
 /// use std::sync::Arc;
@@ -705,7 +706,7 @@ pub async fn write_df_to_file(df: DataFrame, file_path: &str) -> Result<(), Util
 }
 
 /// Register a DataFrame as a *materialized* table (executes immediately)
-/// 
+///
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
@@ -748,7 +749,7 @@ pub async fn register_materialized_df(
 }
 
 /// Register a DataFrame as a *lazy view* (no execution)
-/// 
+///
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
@@ -791,7 +792,7 @@ pub fn register_df_view(
 
 /// Convert dataframe to json like data that can be used later to store as string,
 /// note that not all types can be serealized
-/// 
+///
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
@@ -824,7 +825,7 @@ pub async fn df_to_json_bytes(df: DataFrame) -> Result<Vec<u8>, UtilsError> {
 
 /// Join dataframes using same column name,
 /// right columns used by join will be removed
-/// 
+///
 /// # Examples
 /// ```
 /// # use color_eyre::Result;
@@ -1064,15 +1065,87 @@ mod tests {
 
     #[tokio::test]
     #[rstest]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name", "data"], vec![Some(r#"{"data":42,"id":1,"name":"foo"}"#), Some(r#"{"data":43,"id":2,"name":"bar"}"#), Some(r#"{"data":44,"id":3,"name":"baz"}"#)])]
-    #[case(dataframe!("id" => [Some(1), Some(2), None],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name", "data"], vec![Some(r#"{"data":42,"id":1,"name":"foo"}"#), Some(r#"{"data":43,"id":2,"name":"bar"}"#), Some(r#"{"data":44,"name":"baz"}"#)])]
-    #[case(dataframe!("id" => [None::<i32>, None, None],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name", "data"], vec![Some(r#"{"data":42,"name":"foo"}"#), Some(r#"{"data":43,"name":"bar"}"#), Some(r#"{"data":44,"name":"baz"}"#)])]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "data"], vec![Some(r#"{"data":42,"id":1}"#), Some(r#"{"data":43,"id":2}"#), Some(r#"{"data":44,"id":3}"#)])]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name"], vec![Some(r#"{"id":1,"name":"foo"}"#), Some(r#"{"id":2,"name":"bar"}"#), Some(r#"{"id":3,"name":"baz"}"#)])]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["name", "data"], vec![Some(r#"{"data":42,"name":"foo"}"#), Some(r#"{"data":43,"name":"bar"}"#), Some(r#"{"data":44,"name":"baz"}"#)])]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["name"], vec![Some(r#"{"name":"foo"}"#), Some(r#"{"name":"bar"}"#), Some(r#"{"name":"baz"}"#)])]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["data"], vec![Some(r#"{"data":42}"#), Some(r#"{"data":43}"#), Some(r#"{"data":44}"#)])]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id"], vec![Some(r#"{"id":1}"#), Some(r#"{"id":2}"#), Some(r#"{"id":3}"#)])]
+    #[case(
+        dataframe!("id" => [1, 2, 3], "name" => ["foo", "bar", "baz"], "data" => [42, 43, 44])?,
+        &["id", "name", "data"],
+        vec![
+            Some(r#"{"id":1,"name":"foo","data":42}"#),
+            Some(r#"{"id":2,"name":"bar","data":43}"#),
+            Some(r#"{"id":3,"name":"baz","data":44}"#)
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [Some(1), Some(2), None], "name" => ["foo", "bar", "baz"], "data" => [42, 43, 44])?,
+        &["id", "name", "data"],
+        vec![
+            Some(r#"{"id":1,"name":"foo","data":42}"#),
+            Some(r#"{"id":2,"name":"bar","data":43}"#),
+            Some(r#"{"name":"baz","data":44}"#)
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [None::<i32>, None, None], "name" => ["foo", "bar", "baz"], "data" => [42, 43, 44])?,
+        &["id", "name", "data"],
+        vec![
+            Some(r#"{"name":"foo","data":42}"#),
+            Some(r#"{"name":"bar","data":43}"#),
+            Some(r#"{"name":"baz","data":44}"#),
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3], "name" => ["foo", "bar", "baz"], "data" => [42, 43, 44])?,
+        &["id", "data"],
+        vec![
+            Some(r#"{"id":1,"data":42}"#),
+            Some(r#"{"id":2,"data":43}"#),
+            Some(r#"{"id":3,"data":44}"#)
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3], "name" => ["foo", "bar", "baz"], "data" => [42, 43, 44])?,
+        &["id", "name"],
+        vec![
+            Some(r#"{"id":1,"name":"foo"}"#),
+            Some(r#"{"id":2,"name":"bar"}"#),
+            Some(r#"{"id":3,"name":"baz"}"#)
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3], "name" => ["foo", "bar", "baz"], "data" => [42, 43, 44])?,
+        &["name", "data"],
+        vec![
+            Some(r#"{"name":"foo","data":42}"#),
+            Some(r#"{"name":"bar","data":43}"#),
+            Some(r#"{"name":"baz","data":44}"#)
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3], "name" => ["foo", "bar", "baz"], "data" => [42, 43, 44])?,
+        &["name"],
+        vec![
+            Some(r#"{"name":"foo"}"#),
+            Some(r#"{"name":"bar"}"#),
+            Some(r#"{"name":"baz"}"#)
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3], "name" => ["foo", "bar", "baz"], "data" => [42, 43, 44])?,
+        &["data"],
+        vec![
+            Some(r#"{"data":42}"#),
+            Some(r#"{"data":43}"#),
+            Some(r#"{"data":44}"#)
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3], "name" => ["foo", "bar", "baz"], "data" => [42, 43, 44])?,
+        &["id"],
+        vec![
+            Some(r#"{"id":1}"#),
+            Some(r#"{"id":2}"#),
+            Some(r#"{"id":3}"#)
+        ]
+    )]
     async fn test_cols_to_json(
         #[case] df: DataFrame,
         #[case] cols: &[&str],
@@ -1223,9 +1296,18 @@ mod tests {
 
     #[tokio::test]
     #[rstest]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, r#"[{"data":42,"id":1,"name":"foo"},{"data":43,"id":2,"name":"bar"},{"data":44,"id":3,"name":"baz"}]"#)]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, r#"[{"id":1,"name":"foo"},{"id":2,"name":"bar"},{"id":3,"name":"baz"}]"#)]
-    #[case(dataframe!("id" => [1, 2, 3])?, r#"[{"id":1},{"id":2},{"id":3}]"#)]
+    #[case(
+        dataframe!("id" => [1, 2, 3], "name" => ["foo", "bar", "baz"], "data" => [42, 43, 44])?,
+        r#"[{"id":1,"name":"foo","data":42},{"id":2,"name":"bar","data":43},{"id":3,"name":"baz","data":44}]"#
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3], "name" => ["foo", "bar", "baz"])?,
+        r#"[{"id":1,"name":"foo"},{"id":2,"name":"bar"},{"id":3,"name":"baz"}]"#
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3])?,
+        r#"[{"id":1},{"id":2},{"id":3}]"#
+    )]
     async fn test_df_to_json_bytes(#[case] df: DataFrame, #[case] expected: &str) -> Result<()> {
         let res = df_to_json_bytes(df).await?;
         let value: Value = serde_json::from_slice(&res)?;
@@ -1249,7 +1331,7 @@ mod tests {
         assert_eq!(arrays, expected);
         Ok(())
     }
-    
+
     #[tokio::test]
     #[rstest]
     #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef])]
@@ -1267,7 +1349,7 @@ mod tests {
         assert_eq!(arrays, expected);
         Ok(())
     }
-    
+
     #[tokio::test]
     #[rstest]
     #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef])]
