@@ -7,8 +7,8 @@ use datafusion::datasource::MemTable;
 use datafusion::functions_aggregate::average;
 use datafusion::functions_aggregate::count::{self, count};
 use datafusion::functions_aggregate::sum::{self, sum};
-use datafusion::logical_expr::{WindowFrame, WindowFunctionDefinition};
 use datafusion::logical_expr::expr::WindowFunction;
+use datafusion::logical_expr::{WindowFrame, WindowFunctionDefinition};
 use datafusion::prelude::*;
 
 pub async fn query_example() -> Result<()> {
@@ -115,12 +115,8 @@ async fn query3() -> Result<()> {
 
 async fn query4() -> Result<()> {
     let ctx = SessionContext::new();
-    ctx.register_parquet(
-        "t",
-        ".data/alltypes_plain.parquet",
-        ParquetReadOptions::default(),
-    )
-    .await?;
+    ctx.register_csv("t", "../data/csv/cars.csv", CsvReadOptions::default())
+        .await?;
     let res = ctx.sql("select * from t").await?;
     res.show().await?;
     Ok(())
@@ -183,11 +179,14 @@ async fn aggregates_example() -> Result<()> {
     )?;
 
     // multiple aggregates
-    let res = df.clone().aggregate(vec![], vec![
-        count(col("id")).alias("count_id"),
-        sum(col("data")).alias("sum_data"),
-        count(col("name")).alias("count_name"),
-    ])?;
+    let res = df.clone().aggregate(
+        vec![],
+        vec![
+            count(col("id")).alias("count_id"),
+            sum(col("data")).alias("sum_data"),
+            count(col("name")).alias("count_name"),
+        ],
+    )?;
     res.show().await?;
 
     // multiple aggregates + window functions
@@ -209,9 +208,7 @@ async fn aggregates_example() -> Result<()> {
     // multiple aggregates + window functions
     // using DataFrame API
     let count_window_function = Expr::WindowFunction(Box::new(WindowFunction::new(
-        WindowFunctionDefinition::AggregateUDF(
-            count::count_udaf(),
-        ),
+        WindowFunctionDefinition::AggregateUDF(count::count_udaf()),
         vec![col("id")],
     )))
     .partition_by(vec![col("name")])
@@ -220,9 +217,7 @@ async fn aggregates_example() -> Result<()> {
     .build()?;
 
     let sum_window_function = Expr::WindowFunction(Box::new(WindowFunction::new(
-        WindowFunctionDefinition::AggregateUDF(
-            sum::sum_udaf(),
-        ),
+        WindowFunctionDefinition::AggregateUDF(sum::sum_udaf()),
         vec![col("data")],
     )))
     .partition_by(vec![col("name")])
@@ -231,9 +226,7 @@ async fn aggregates_example() -> Result<()> {
     .build()?;
 
     let avg_window_function = Expr::WindowFunction(Box::new(WindowFunction::new(
-        WindowFunctionDefinition::AggregateUDF(
-            average::avg_udaf(),
-        ),
+        WindowFunctionDefinition::AggregateUDF(average::avg_udaf()),
         vec![col("data")],
     )))
     .partition_by(vec![col("name")])
@@ -246,17 +239,23 @@ async fn aggregates_example() -> Result<()> {
         .with_column("cnt", count_window_function.clone())?
         .with_column("sum_data", sum_window_function.clone())?
         .with_column("avg_data", avg_window_function.clone())?
-        .select(vec![col("id"), col("cnt"), col("sum_data"), col("avg_data")])?
+        .select(vec![
+            col("id"),
+            col("cnt"),
+            col("sum_data"),
+            col("avg_data"),
+        ])?
         .sort_by(vec![col("id")])?;
     res.show().await?;
 
-    let res = df.window(vec![
-        count_window_function.alias("cnt"),
-        sum_window_function.alias("sum_data"),
-        avg_window_function.alias("avg_data")
-    ])?
-    .select_columns(&["id", "cnt", "sum_data", "avg_data"])?
-    .sort_by(vec![col("id")])?;
+    let res = df
+        .window(vec![
+            count_window_function.alias("cnt"),
+            sum_window_function.alias("sum_data"),
+            avg_window_function.alias("avg_data"),
+        ])?
+        .select_columns(&["id", "cnt", "sum_data", "avg_data"])?
+        .sort_by(vec![col("id")])?;
     res.show().await?;
 
     Ok(())
