@@ -893,11 +893,26 @@ mod tests {
     use rstest::rstest;
 
     #[rstest]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, Some(vec!["id", "name", "data"]))]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, Some(vec!["id", "name"]))]
-    #[case(dataframe!("id" => [1, 2, 3],"data" => [42, 43, 44])?, Some(vec!["id", "data"]))]
-    #[case(dataframe!("id" => [1, 2, 3])?, Some(vec!["id"]))]
-    #[case(dataframe!()?, None)]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?,
+        Some(vec!["id", "name", "data"])
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?,
+        Some(vec!["id", "name"])
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"data" => [42, 43, 44])?,
+        Some(vec!["id", "data"])
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3])?,
+        Some(vec!["id"])
+    )]
+    #[case::dataframe_empty(
+        dataframe!()?,
+        None
+    )]
     fn test_get_column_names(
         #[case] df: DataFrame,
         #[case] expected: Option<Vec<&str>>,
@@ -908,13 +923,34 @@ mod tests {
 
     #[tokio::test]
     #[rstest]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, false)]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, false)]
-    #[case(dataframe!("id" => [1, 2, 3],"data" => [42, 43, 44])?, false)]
-    #[case(dataframe!("id" => [1, 2, 3])?, false)]
-    #[case(dataframe!("id" => [1])?, false)]
-    #[case(dataframe!("id" => [None::<i32>])?, false)]
-    #[case(dataframe!()?, true)]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?,
+        false
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?,
+        false
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"data" => [42, 43, 44])?,
+        false
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3])?,
+        false
+    )]
+    #[case(
+        dataframe!("id" => [1])?,
+        false
+    )]
+    #[case::dataframe_with_none_vals(
+        dataframe!("id" => [None::<i32>])?,
+        false
+    )]
+    #[case::dataframe_empty(
+        dataframe!()?,
+        true
+    )]
     async fn test_is_empty(#[case] df: DataFrame, #[case] expected: bool) -> Result<()> {
         assert_eq!(is_empty(df).await?, expected);
         Ok(())
@@ -922,10 +958,26 @@ mod tests {
 
     #[tokio::test]
     #[rstest]
-    #[case(vec![dataframe!("id" => [1, 2])?, dataframe!("id" => [3, 4])?], vec![Arc::new(Int32Array::from(vec![1, 2, 3, 4])) as ArrayRef])]
-    #[case(vec![dataframe!("id" => [1, 2])?, dataframe!("id" => [3])?], vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef])]
-    #[case(vec![dataframe!("id" => [1, 2, 3])?, dataframe!("id" => [4])?], vec![Arc::new(Int32Array::from(vec![1, 2, 3, 4])) as ArrayRef])]
-    #[case(vec![dataframe!("name" => ["foo", "bar"])?, dataframe!("name" => ["baz"])?], vec![Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
+    #[case(
+        vec![dataframe!("id" => [1, 2])?, dataframe!("id" => [3, 4])?],
+        vec![Arc::new(Int32Array::from(vec![1, 2, 3, 4])) as ArrayRef]
+    )]
+    #[case(
+        vec![dataframe!("id" => [1, 2])?, dataframe!("id" => [3])?],
+        vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef]
+    )]
+    #[case(
+        vec![dataframe!("id" => [1, 2, 3])?, dataframe!("id" => [4])?],
+        vec![Arc::new(Int32Array::from(vec![1, 2, 3, 4])) as ArrayRef]
+    )]
+    #[case(
+        vec![dataframe!("name" => ["foo", "bar"])?, dataframe!("name" => ["baz"])?],
+        vec![Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef]
+    )]
+    #[case(
+        vec![dataframe!("name" => [None::<String>])?, dataframe!("name" => ["foo"])?],
+        vec![Arc::new(StringArray::from(vec![None, Some("foo")])) as ArrayRef]
+    )]
     async fn test_concat_dfs(
         #[case] dfs: Vec<DataFrame>,
         #[case] expected: Vec<ArrayRef>,
@@ -942,10 +994,26 @@ mod tests {
 
     #[tokio::test]
     #[rstest]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, Arc::new(Int32Array::from(vec![1, 2, 3])), Some(vec!["id", "name", "data", "new_col"]))]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, Arc::new(Int32Array::from(vec![1, 2, 3])), Some(vec!["id", "name", "new_col"]))]
-    #[case(dataframe!("id" => [1, 2, 3],"data" => [42, 43, 44])?, Arc::new(Int32Array::from(vec![1, 2, 3])), Some(vec!["id", "data", "new_col"]))]
-    #[case(dataframe!("id" => [1, 2, 3])?, Arc::new(Int32Array::from(vec![1, 2, 3])), Some(vec!["id", "new_col"]))]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?,
+        Arc::new(Int32Array::from(vec![1, 2, 3])),
+        Some(vec!["id", "name", "data", "new_col"])
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?,
+        Arc::new(Int32Array::from(vec![1, 2, 3])),
+        Some(vec!["id", "name", "new_col"])
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"data" => [42, 43, 44])?,
+        Arc::new(Int32Array::from(vec![1, 2, 3])),
+        Some(vec!["id", "data", "new_col"])
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3])?,
+        Arc::new(Int32Array::from(vec![1, 2, 3])),
+        Some(vec!["id", "new_col"])
+    )]
     async fn test_add_column_to_df_columns(
         #[case] df: DataFrame,
         #[case] data: ArrayRef,
@@ -973,10 +1041,26 @@ mod tests {
 
     #[tokio::test]
     #[rstest]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name", "data"], Some(vec!["new_col"]))]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name"], Some(vec!["data", "new_col"]))]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "data"], Some(vec!["name", "new_col"]))]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["name", "data"], Some(vec!["id", "new_col"]))]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?,
+        &["id", "name", "data"],
+        Some(vec!["new_col"])
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?,
+        &["id", "name"],
+        Some(vec!["data", "new_col"])
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?,
+        &["id", "data"],
+        Some(vec!["name", "new_col"])
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?,
+        &["name", "data"],
+        Some(vec!["id", "new_col"])
+    )]
     async fn test_cols_to_json_columns(
         #[case] df: DataFrame,
         #[case] cols: &[&str],
@@ -991,10 +1075,39 @@ mod tests {
 
     #[tokio::test]
     #[rstest]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, Arc::new(Int32Array::from(vec![1, 2, 3])), vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef])]
-    #[case(dataframe!("id" => [1, 2, 3])?, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])), vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
-    #[case(dataframe!("id" => [1, 2, 3])?, Arc::new(Float32Array::from(vec![42., 43., 44.])), vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(Float32Array::from(vec![42., 43., 44.])) as ArrayRef])]
-    #[case(dataframe!("id" => [1, 2, 3])?, Arc::new(BooleanArray::from(vec![true, true, false])), vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(BooleanArray::from(vec![true, true, false])) as ArrayRef])]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?,
+        Arc::new(Int32Array::from(vec![1, 2, 3])),
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef,
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef,
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3])?,
+        Arc::new(StringArray::from(vec!["foo", "bar", "baz"])),
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef,
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3])?,
+        Arc::new(Float32Array::from(vec![42., 43., 44.])),
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef,
+            Arc::new(Float32Array::from(vec![42., 43., 44.])) as ArrayRef
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3])?,
+        Arc::new(BooleanArray::from(vec![true, true, false])),
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef,
+            Arc::new(BooleanArray::from(vec![true, true, false])) as ArrayRef
+        ]
+    )]
     async fn test_add_column_to_df(
         #[case] df: DataFrame,
         #[case] data: ArrayRef,
@@ -1030,10 +1143,51 @@ mod tests {
 
     #[tokio::test]
     #[rstest]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, &[("data", Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef)], vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef])]
-    #[case(dataframe!("id" => [1, 2, 3])?, &[("name", Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef), ("data", Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef)], vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef])]
-    #[case(dataframe!("id" => [1, 2, 3])?, &[("data", Arc::new(Float32Array::from(vec![42., 43., 44.])) as ArrayRef), ("name", Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef)], vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(Float32Array::from(vec![42., 43., 44.])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
-    #[case(dataframe!("id" => [1, 2, 3])?, &[("data", Arc::new(BooleanArray::from(vec![true, true, false])) as ArrayRef), ("name", Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef)], vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(BooleanArray::from(vec![true, true, false])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?,
+        &[("data", Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef)],
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef,
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef,
+            Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3])?,
+        &[
+            ("name", Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef),
+            ("data", Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef)
+        ],
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef,
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef,
+            Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3])?,
+        &[
+            ("data", Arc::new(Float32Array::from(vec![42., 43., 44.])) as ArrayRef),
+            ("name", Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef)
+        ],
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef,
+            Arc::new(Float32Array::from(vec![42., 43., 44.])) as ArrayRef,
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3])?,
+        &[
+            ("data", Arc::new(BooleanArray::from(vec![true, true, false])) as ArrayRef),
+            ("name", Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef)
+        ],
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef,
+            Arc::new(BooleanArray::from(vec![true, true, false])) as ArrayRef,
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef
+        ]
+    )]
     async fn test_add_columns_to_df(
         #[case] df: DataFrame,
         #[case] data: &[(&str, ArrayRef)],
@@ -1176,10 +1330,41 @@ mod tests {
 
     #[tokio::test]
     #[rstest]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, &["id", "name", "data"], vec![vec!["1", "foo", "42"], vec!["2", "bar", "43"], vec!["3", "baz", "44"]])]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [true, true, false])?, &["id", "name", "data"], vec![vec!["1", "foo", "true"], vec!["2", "bar", "true"], vec!["3", "baz", "false"]])]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, &["id", "name"], vec![vec!["1", "foo"], vec!["2", "bar"], vec!["3", "baz"]])]
-    #[case(dataframe!("id" => [1, 2, 3])?, &["id"], vec![vec!["1"], vec!["2"], vec!["3"]])]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?,
+        &["id", "name", "data"],
+        vec![
+            vec!["1", "foo", "42"],
+            vec!["2", "bar", "43"],
+            vec!["3", "baz", "44"]
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [true, true, false])?,
+        &["id", "name", "data"],
+        vec![
+            vec!["1", "foo", "true"],
+            vec!["2", "bar", "true"],
+            vec!["3", "baz", "false"]
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?,
+        &["id", "name"],
+        vec![
+            vec!["1", "foo"],
+            vec!["2", "bar"],
+            vec!["3", "baz"]
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3])?, &["id"],
+        vec![
+            vec!["1"],
+            vec!["2"],
+            vec!["3"]
+        ]
+    )]
     async fn test_cols_to_struct(
         #[case] df: DataFrame,
         #[case] cols: &[&str],
@@ -1218,11 +1403,26 @@ mod tests {
 
     #[tokio::test]
     #[rstest]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, vec![3, 3])]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, vec![2, 3])]
-    #[case(dataframe!("id" => [1, 2, 3])?, vec![1, 3])]
-    #[case(dataframe!("id" => [1, 2])?, vec![1, 2])]
-    #[case(dataframe!()?, vec![0, 0])]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?,
+        vec![3, 3]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?,
+        vec![2, 3]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3])?,
+        vec![1, 3]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2])?,
+        vec![1, 2]
+    )]
+    #[case::dataframe_empty(
+        dataframe!()?,
+        vec![0, 0]
+    )]
     async fn test_concat_df_batches_cols_rows(
         #[case] df: DataFrame,
         #[case] expected: Vec<usize>,
@@ -1235,9 +1435,23 @@ mod tests {
 
     #[tokio::test]
     #[rstest]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef])]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
-    #[case(dataframe!("id" => [1, 2, 3])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef])]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?,
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef,
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef,
+            Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?,
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef,
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3])?,
+        vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef]
+    )]
     async fn test_concat_df_batches(
         #[case] df: DataFrame,
         #[case] expected: Vec<ArrayRef>,
@@ -1250,10 +1464,22 @@ mod tests {
 
     #[tokio::test]
     #[rstest]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, vec![3, 3])]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, vec![2, 3])]
-    #[case(dataframe!("id" => [1, 2, 3])?, vec![1, 3])]
-    #[case(dataframe!("id" => [1, 2])?, vec![1, 2])]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?,
+        vec![3, 3]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?,
+        vec![2, 3]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3])?,
+        vec![1, 3]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2])?,
+        vec![1, 2]
+    )]
     async fn test_concat_arrays_cols_rows(
         #[case] df: DataFrame,
         #[case] expected: Vec<usize>,
@@ -1268,9 +1494,25 @@ mod tests {
 
     #[tokio::test]
     #[rstest]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef])]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
-    #[case(dataframe!("id" => [1, 2, 3])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef])]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?,
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef,
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef,
+            Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?,
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef,
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3])?,
+        vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef]
+    )]
     async fn test_concat_arrays(
         #[case] df: DataFrame,
         #[case] expected: Vec<ArrayRef>,
@@ -1317,9 +1559,44 @@ mod tests {
 
     #[tokio::test]
     #[rstest]
-    #[case(vec![dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, dataframe!("id" => [1, 2, 3],"data" => [42, 43, 44])?], &["id"], vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef])]
-    #[case(vec![dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"value" => ["foo", "bar", "baz"])?, dataframe!("id" => [1, 2, 3],"data" => [42, 43, 44])?], &["id"], vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef])]
-    #[case(vec![dataframe!("id" => [1, 2, 3],"pk" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, dataframe!("id" => [1, 2, 3],"pk" => [1, 2, 3],"data" => [42, 43, 44])?], &["id", "pk"], vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef])]
+    #[case(
+        vec![
+            dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?,
+            dataframe!("id" => [1, 2, 3],"data" => [42, 43, 44])?
+        ],
+        &["id"],
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef,
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef,
+            Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef
+        ]
+    )]
+    #[case(
+        vec![
+            dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"value" => ["foo", "bar", "baz"])?,
+            dataframe!("id" => [1, 2, 3],"data" => [42, 43, 44])?
+        ],
+        &["id"],
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef,
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef,
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef,
+            Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef
+        ]
+    )]
+    #[case(
+        vec![
+            dataframe!("id" => [1, 2, 3],"pk" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?,
+            dataframe!("id" => [1, 2, 3],"pk" => [1, 2, 3],"data" => [42, 43, 44])?
+        ],
+        &["id", "pk"],
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef,
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef,
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef,
+            Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef
+        ]
+    )]
     async fn test_join_dfs(
         #[case] dfs: Vec<DataFrame>,
         #[case] columns: &[&str],
@@ -1334,9 +1611,25 @@ mod tests {
 
     #[tokio::test]
     #[rstest]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef])]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
-    #[case(dataframe!("id" => [1, 2, 3])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef])]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?,
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef,
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef,
+            Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?,
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef,
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3])?,
+        vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef]
+    )]
     async fn test_register_df_view(
         #[case] df: DataFrame,
         #[case] expected: Vec<ArrayRef>,
@@ -1352,9 +1645,25 @@ mod tests {
 
     #[tokio::test]
     #[rstest]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef, Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef])]
-    #[case(dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef, Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef])]
-    #[case(dataframe!("id" => [1, 2, 3])?, vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef])]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"],"data" => [42, 43, 44])?,
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef,
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef,
+            Arc::new(Int32Array::from(vec![42, 43, 44])) as ArrayRef
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3],"name" => ["foo", "bar", "baz"])?,
+        vec![
+            Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef,
+            Arc::new(StringArray::from(vec!["foo", "bar", "baz"])) as ArrayRef
+        ]
+    )]
+    #[case(
+        dataframe!("id" => [1, 2, 3])?,
+        vec![Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef]
+    )]
     async fn test_register_materialized_df(
         #[case] df: DataFrame,
         #[case] expected: Vec<ArrayRef>,
