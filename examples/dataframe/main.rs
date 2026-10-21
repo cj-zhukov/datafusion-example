@@ -4,7 +4,7 @@
 //!
 //! ## Usage
 //! ```bash
-//! cargo run --example dataframe -- [all|actions|convert_vec_structs_to_df|convert_vec_structs_to_df_v2|convert_vec_structs_to_df_v3|create|deserialize_to_struct|operations|query]
+//! cargo run --example dataframe -- [all|actions|convert_vec_structs_to_df|convert_vec_structs_to_df_v2|convert_vec_structs_to_df_v3|create|custom_table_provider|deserialize_to_struct|operations|query]
 //! ```
 //!
 //! Each subcommand runs a corresponding example:
@@ -13,7 +13,8 @@
 //! - `convert_vec_structs_to_df` — example of deserialization vec of custom structs to dataframe
 //! - `convert_vec_structs_to_df_v2` — example of deserialization vec of custom structs to dataframe
 //! - `convert_vec_structs_to_df_v3` — example of deserialization vec of custom structs to dataframe using trait
-//! - `create` — Creating dataframe examples
+//! - `create` — creating dataframe examples
+//! - `custom_table_provider` — creating custom table provider example
 //! - `deserialize_to_struct` — example of deserialization dataframe to struct
 //! - `operations` — examples of operations with dataframe like joins, add/update column, etc
 //! - `query` — quering dataframe examples
@@ -23,6 +24,7 @@ mod convert_vec_structs_to_df;
 mod convert_vec_structs_to_df_v2;
 mod convert_vec_structs_to_df_v3;
 mod create;
+mod custom_table_provider;
 mod deserialize_to_struct;
 mod operations;
 mod query;
@@ -40,6 +42,7 @@ enum ExampleKind {
     ConvertVecStructsToDfV2,
     ConvertVecStructsToDfV3,
     Create,
+    CustomTableProvider,
     DeserializeToStruct,
     Operations,
     Query,
@@ -71,6 +74,9 @@ impl ExampleKind {
                 convert_vec_structs_to_df_v3::convert_vec_structs_to_df_v3_example().await?
             }
             ExampleKind::Create => create::create_example().await?,
+            ExampleKind::CustomTableProvider => {
+                custom_table_provider::custom_table_provider_example().await?
+            }
             ExampleKind::DeserializeToStruct => {
                 deserialize_to_struct::deserialize_to_struct_examle().await?
             }
