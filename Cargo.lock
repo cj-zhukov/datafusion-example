@@ -2142,6 +2142,7 @@ name = "datafusion_example"
 version = "1.0.0"
 dependencies = [
  "arrow-json",
+ "async-trait",
  "aws-config",
  "aws-creds",
  "aws-sdk-s3",
